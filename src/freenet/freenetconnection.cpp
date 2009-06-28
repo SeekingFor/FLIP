@@ -11,6 +11,7 @@
 #include "freenetmessagefinder.h"
 #include "freenetmessagedownloader.h"
 #include "freenetmessageeditionpoller.h"
+#include "dbmaintenance.h"
 
 #include <cstdlib>
 
@@ -27,6 +28,7 @@ FreenetConnection::FreenetConnection():m_receivednodehello(false),m_lasttriedcon
 	m_objects.push_back(new FreenetMessageFinder(this,&m_fcp));
 	m_objects.push_back(new FreenetMessageDownloader(this,&m_fcp));
 	m_objects.push_back(new FreenetMessageEditionPoller(this,&m_fcp));
+	m_objects.push_back(new DBMaintenance(this));
 
 }
 

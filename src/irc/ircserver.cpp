@@ -242,10 +242,10 @@ const bool IRCServer::HandleFLIPEvent(const FLIPEvent &flipevent)
 		int minute=0;
 		int second=0;
 		DateTime sentdate;
-		DateTime fiveminutesago;
+		DateTime tenminutesago;
 		DateTime fiveminutesfromnow;
 
-		fiveminutesago.Add(0,-5);
+		tenminutesago.Add(0,-10);
 		fiveminutesfromnow.Add(0,5);
 
 		StringFunctions::Convert(params["identityid"],identityid);
@@ -261,7 +261,7 @@ const bool IRCServer::HandleFLIPEvent(const FLIPEvent &flipevent)
 
 			sentdate.Set(year,month,day,hour,minute,second);
 
-			if(sentdate>=fiveminutesago && sentdate<=fiveminutesfromnow)
+			if(sentdate>=tenminutesago && sentdate<=fiveminutesfromnow)
 			{
 				SendChannelMessageToClients(identityid,params["channel"],params["message"]);
 			}

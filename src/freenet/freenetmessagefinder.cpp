@@ -6,7 +6,12 @@
 
 FreenetMessageFinder::FreenetMessageFinder(FreenetConnection *connection, FCPv2::Connection *fcp):IFCPConnected(fcp,connection),IPeriodicProcessor(connection),IFCPMessageHandler(connection,"MessageFinder")
 {
+
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_IDENTITYFOUND,this);
+
+	Option option;
+	option.Get("MessageBase",m_messagebase);
+
 }
 
 FreenetMessageFinder::~FreenetMessageFinder()
@@ -16,8 +21,6 @@ FreenetMessageFinder::~FreenetMessageFinder()
 
 void FreenetMessageFinder::FCPConnected()
 {
-	Option option;
-	option.Get("MessageBase",m_messagebase);
 
 	m_ids.clear();
 	m_subscribed.clear();
@@ -137,6 +140,7 @@ void FreenetMessageFinder::Process()
 
 	currentday.StripTime();
 	std::vector<DateTime> m_erase;
+	std::vector<std::pair<int,DateTime> > m_unsubscribe;
 
 	// check if or we are close to changing date and subscribe to all existing connections on new date
 	if(now.Day()!=fiveminutes.Day())
@@ -179,7 +183,8 @@ void FreenetMessageFinder::Process()
 
 					Subscribe((*j),publickey,currentday,0);
 				}
-				Unsubscribe((*j),(*i).first);
+				//Unsubscribe((*j),(*i).first);
+				m_unsubscribe.push_back(std::pair<int,DateTime>((*j),(*i).first));
 			}
 			//i=m_subscribed.erase(i);	// Linux doesn't like this so store dates to delete in a vector and delete them afterwards
 			m_erase.push_back((*i).first);
@@ -189,6 +194,11 @@ void FreenetMessageFinder::Process()
 		{
 			i++;
 		}
+	}
+
+	for(std::vector<std::pair<int,DateTime> >::iterator i=m_unsubscribe.begin(); i!=m_unsubscribe.end(); i++)
+	{
+		Unsubscribe((*i).first,(*i).second);
 	}
 
 	for(std::vector<DateTime>::iterator i=m_erase.begin(); i!=m_erase.end(); i++)

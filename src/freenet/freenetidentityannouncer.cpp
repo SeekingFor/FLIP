@@ -7,6 +7,10 @@ FreenetIdentityAnnouncer::FreenetIdentityAnnouncer(FreenetConnection *connection
 {
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_IRC_USERREGISTER,this);
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_IRC_USERQUIT,this);
+
+	Option option;
+	option.Get("MessageBase",m_messagebase);
+
 }
 
 FreenetIdentityAnnouncer::~FreenetIdentityAnnouncer()
@@ -16,8 +20,6 @@ FreenetIdentityAnnouncer::~FreenetIdentityAnnouncer()
 
 void FreenetIdentityAnnouncer::FCPConnected()
 {
-	Option option;
-	option.Get("MessageBase",m_messagebase);
 	m_lastactivity.SetNowUTC();
 	for(std::map<int,idinfo>::iterator i=m_ids.begin(); i!=m_ids.end(); i++)
 	{

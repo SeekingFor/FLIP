@@ -4,7 +4,8 @@
 
 FreenetNewIdentityFinder::FreenetNewIdentityFinder(FreenetConnection *connection, FCPv2::Connection *fcp):IFCPConnected(fcp,connection),IPeriodicProcessor(connection),IFCPMessageHandler(connection,"NewIdentityFinder"),m_waiting(false)
 {
-	
+	Option option;
+	option.Get("MessageBase",m_messagebase);
 }
 
 FreenetNewIdentityFinder::~FreenetNewIdentityFinder()
@@ -14,8 +15,6 @@ FreenetNewIdentityFinder::~FreenetNewIdentityFinder()
 
 void FreenetNewIdentityFinder::FCPConnected()
 {
-	Option option;
-	option.Get("MessageBase",m_messagebase);
 	m_lastactivity.SetNowUTC();
 	m_waiting=false;
 }

@@ -8,6 +8,10 @@ FreenetIdentityInserter::FreenetIdentityInserter(FreenetConnection *connection, 
 {
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_IRC_USERREGISTER,this);
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_IRC_USERQUIT,this);
+
+	Option option;
+	option.Get("MessageBase",m_messagebase);
+
 }
 
 FreenetIdentityInserter::~FreenetIdentityInserter()
@@ -17,8 +21,6 @@ FreenetIdentityInserter::~FreenetIdentityInserter()
 
 void FreenetIdentityInserter::FCPConnected()
 {
-	Option option;
-	option.Get("MessageBase",m_messagebase);
 	m_inserting=false;
 	m_lastactivity.SetNowUTC();
 }

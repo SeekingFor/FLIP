@@ -8,6 +8,10 @@
 FreenetMessageInserter::FreenetMessageInserter(FreenetConnection *connection, FCPv2::Connection *fcp):IFCPConnected(fcp,connection),IPeriodicProcessor(connection),IFCPMessageHandler(connection,"MessageInserter")
 {
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_IRC_CHANNELMESSAGE,this);
+
+	Option option;
+	option.Get("MessageBase",m_messagebase);
+
 }
 
 FreenetMessageInserter::~FreenetMessageInserter()
@@ -17,8 +21,7 @@ FreenetMessageInserter::~FreenetMessageInserter()
 
 void FreenetMessageInserter::FCPConnected()
 {
-	Option option;
-	option.Get("MessageBase",m_messagebase);
+
 }
 
 void FreenetMessageInserter::FCPDisconnected()

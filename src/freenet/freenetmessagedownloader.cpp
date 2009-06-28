@@ -6,6 +6,10 @@
 FreenetMessageDownloader::FreenetMessageDownloader(FreenetConnection *connection, FCPv2::Connection *fcp):IFCPConnected(fcp,connection),IFCPMessageHandler(connection,"MessageDownloader")
 {
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_NEWMESSAGEEDITION,this);
+
+	Option option;
+	option.Get("MessageBase",m_messagebase);
+
 }
 
 FreenetMessageDownloader::~FreenetMessageDownloader()
@@ -15,8 +19,7 @@ FreenetMessageDownloader::~FreenetMessageDownloader()
 
 void FreenetMessageDownloader::FCPConnected()
 {
-	Option option;
-	option.Get("MessageBase",m_messagebase);
+
 }
 
 void FreenetMessageDownloader::FCPDisconnected()
@@ -52,6 +55,7 @@ const bool FreenetMessageDownloader::HandleFCPMessage(FCPv2::Message &message)
 						params["channel"]=fm["channel"];
 						params["sentdate"]=fm["sentdate"];
 						params["message"]=fm.Body();
+						params["edition"]=idparts[3];
 
 						DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_FREENET_NEWMESSAGE,params));
 					}

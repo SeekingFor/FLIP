@@ -5,16 +5,26 @@
 #include "irc/ircserver.h"
 #include "freenet/freenetconnection.h"
 
+#include <cstdio>
+
 int main()
 {
 	int loglevel=LogFile::LOGLEVEL_DEBUG;
 	Option option;
+	global::db.Open("flip.db3");
+
+	SetupDB(&global::db);
+	SetupDefaultOptions(&global::db);
+
 	IRCServer irc;
 	FreenetConnection fn;
 
-	global::db.Open("flip.db3");
-	SetupDB(&global::db);
-	SetupDefaultOptions(&global::db);
+	unlink("flip-5.log");
+	rename("flip-4.log","flip-5.log");
+	rename("flip-3.log","flip-4.log");
+	rename("flip-2.log","flip-3.log");
+	rename("flip-1.log","flip-2.log");
+	rename("flip.log","flip-1.log");
 
 	global::log.SetFileName("flip.log");
 	global::log.OpenFile();

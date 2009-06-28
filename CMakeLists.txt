@@ -24,6 +24,7 @@ src/stringfunctions.cpp
 src/db/sqlite3db/sqlite3db.cpp
 src/db/sqlite3db/sqlite3recordset.cpp
 src/db/sqlite3db/sqlite3statement.cpp
+src/freenet/dbmaintenance.cpp
 src/freenet/fcpv2.cpp
 src/freenet/freenetconnection.cpp
 src/freenet/freenetidentityannouncer.cpp

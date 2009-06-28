@@ -9,6 +9,10 @@
 FreenetIdentityRequester::FreenetIdentityRequester(FreenetConnection *connection, FCPv2::Connection *fcp):IFCPConnected(fcp,connection),IPeriodicProcessor(connection),IFCPMessageHandler(connection,"IdentityRequester"),m_maxrequests(5)
 {
 	m_lastloadedids.Add(0,0,0,0,0,-1);
+
+	Option option;
+	option.Get("MessageBase",m_messagebase);
+
 }
 
 FreenetIdentityRequester::~FreenetIdentityRequester()
@@ -18,8 +22,6 @@ FreenetIdentityRequester::~FreenetIdentityRequester()
 
 void FreenetIdentityRequester::FCPConnected()
 {
-	Option option;
-	option.Get("MessageBase",m_messagebase);
 	m_lastactivity.SetNowUTC();
 	m_ids.clear();
 }
