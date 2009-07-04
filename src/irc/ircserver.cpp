@@ -135,7 +135,7 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 
 					for(std::set<int>::iterator j=m_idchannels[(*i)].begin(); j!=m_idchannels[(*i)].end(); j++)
 					{
-						if(m_ids[(*j)].m_nick!="")
+						if(m_ids[(*j)].m_nick!="" && m_ids[(*j)].m_publickey!=client->PublicKey())
 						{
 							std::string idstr("");
 							StringFunctions::Convert((*j),idstr);
@@ -219,9 +219,13 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 	}
 	else if(command.GetCommand()=="PING")
 	{
-		if(command.GetParameters().size()>1 && command.GetParameters()[0]==client->Nick())
+		if(command.GetParameters().size()>=1 && command.GetParameters()[0]==client->Nick())
 		{
 			client->SendCommand(":"+m_servername+" PONG "+m_servername+" :"+client->Nick());
+		}
+		else if(command.GetParameters().size()==1 && command.GetParameters()[0].size()>0 && command.GetParameters()[0][0]==':')
+		{
+			client->SendCommand(":"+m_servername+" PONG "+m_servername+" "+command.GetParameters()[0]);
 		}
 	}
 
@@ -233,39 +237,29 @@ const bool IRCServer::HandleFLIPEvent(const FLIPEvent &flipevent)
 	if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_NEWMESSAGE)
 	{
 		std::map<std::string,std::string> params=flipevent.GetParameters();
-		std::vector<std::string> dateparts;
 		int identityid=0;
-		int year=0;
-		int month=0;
-		int day=0;
-		int hour=0;
-		int minute=0;
-		int second=0;
 		DateTime sentdate;
-		DateTime tenminutesago;
+		DateTime thirtyminutesago;
 		DateTime fiveminutesfromnow;
 
-		tenminutesago.Add(0,-10);
+		thirtyminutesago.Add(0,-30);
 		fiveminutesfromnow.Add(0,5);
 
 		StringFunctions::Convert(params["identityid"],identityid);
-		StringFunctions::SplitMultiple(params["sentdate"]," -:",dateparts);
-		if(dateparts.size()==6)
+
+		if(DateTime::TryParse(params["sentdate"],sentdate))
 		{
-			StringFunctions::Convert(dateparts[0],year);
-			StringFunctions::Convert(dateparts[1],month);
-			StringFunctions::Convert(dateparts[2],day);
-			StringFunctions::Convert(dateparts[3],hour);
-			StringFunctions::Convert(dateparts[4],minute);
-			StringFunctions::Convert(dateparts[5],second);
 
-			sentdate.Set(year,month,day,hour,minute,second);
-
-			if(sentdate>=tenminutesago && sentdate<=fiveminutesfromnow)
+			if((m_idhassent.find(identityid)!=m_idhassent.end()) || (sentdate>=thirtyminutesago && sentdate<=fiveminutesfromnow))
 			{
 				SendChannelMessageToClients(identityid,params["channel"],params["message"]);
+				m_idhassent.insert(identityid);
 			}
 
+		}
+		else
+		{
+			m_log->Debug("IRCServer::HandleFLIPEvent error parsing date "+params["sentdate"]);
 		}
 		return true;
 	}

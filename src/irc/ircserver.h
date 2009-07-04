@@ -44,6 +44,7 @@ private:
 
 	std::map<int,idinfo> m_ids;
 	std::map<std::string,std::set<int> > m_idchannels;	// channels each id is in
+	std::set<int> m_idhassent;							// contains id if that identity has already sent a message within the window - we will accept all messages after no matter when they were sent
 
 	#ifdef _WIN32
 	static bool m_wsastartup;

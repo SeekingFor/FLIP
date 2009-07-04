@@ -95,7 +95,7 @@ const bool FreenetIdentityAnnouncer::HandleFLIPEvent(const FLIPEvent &flipevent)
 		int id=0;
 		StringFunctions::Convert(params["localidentityid"],id);
 		m_ids[id].m_active=true;
-		m_ids[id].m_lastannounced.Add(0,0,-1);
+		m_ids[id].m_lastannounced.Add(0,0,0,-1);
 		m_ids[id].m_announcing=false;
 	}
 	else if(flipevent.GetType()==FLIPEvent::EVENT_IRC_USERQUIT)
@@ -111,11 +111,12 @@ void FreenetIdentityAnnouncer::Process()
 {
 	if(m_ids.size()>0)
 	{
+		DateTime now;
 		DateTime tenminutespassed;
-		DateTime thirtyminutespassed;
+		DateTime sixhourspassed;
 
 		tenminutespassed.Add(0,-10);
-		thirtyminutespassed.Add(0,-30);
+		sixhourspassed.Add(0,0,-6);
 
 		if(m_lastactivity<tenminutespassed)
 		{
@@ -128,7 +129,7 @@ void FreenetIdentityAnnouncer::Process()
 
 		for(std::map<int,idinfo>::iterator i=m_ids.begin(); i!=m_ids.end(); i++)
 		{
-			if((*i).second.m_active && ((*i).second.m_announcing==false && (*i).second.m_lastannounced<thirtyminutespassed))
+			if((*i).second.m_active && ((*i).second.m_announcing==false && ((*i).second.m_lastannounced<sixhourspassed) || (*i).second.m_lastannounced.Day()!=now.Day()))
 			{
 				StartInsert((*i).first);
 			}

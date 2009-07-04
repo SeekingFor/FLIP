@@ -1,6 +1,7 @@
 #include "datetime.h"
 
 #include <vector>
+#include <sstream>
 
 #ifndef _WIN32
 	#include <librock/datime.h>
@@ -36,6 +37,19 @@ void DateTime::Add(const int seconds, const int minutes, const int hours, const 
 	time_t temp;
 	librock_mkgmtime((const librock_STRUCT_TM_s *)&m_tm,(librock_TIME_T_s *)&temp);
 #endif
+}
+
+const bool DateTime::Convert(const std::string &input, int &output)
+{
+	std::istringstream i(input);
+	if(i>>output)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
 }
 
 const std::string DateTime::Format(const std::string &format) const
@@ -105,4 +119,137 @@ const bool DateTime::operator>(const DateTime &rhs) const
 const bool DateTime::operator>=(const DateTime &rhs) const
 {
 	return !(*this<rhs);
+}
+
+const bool DateTime::TryParse(const std::string &datestring, DateTime &date)
+{
+	int year=0;
+	int month=0;
+	int day=0;
+	int hour=0;
+	int minute=0;
+	int second=0;
+	bool foundyear=false;
+	bool foundmonth=false;
+	bool foundday=false;
+	bool foundhour=false;
+	bool foundminute=false;
+	bool foundsecond=false;
+
+	std::vector<std::string> dateparts;
+	std::vector<std::string>::size_type datepos=0;
+	std::string::size_type offset=0;
+	std::string::size_type delimIndex=0;
+    
+	delimIndex=datestring.find_first_of("-/ :",offset);
+
+    while(delimIndex!=std::string::npos)
+    {
+        dateparts.push_back(datestring.substr(offset,delimIndex-offset));
+        offset+=delimIndex-offset+1;
+		delimIndex=datestring.find_first_of("-/ :", offset);
+    }
+
+    dateparts.push_back(datestring.substr(offset));
+
+	for(datepos=0; datepos<dateparts.size(); )
+	{
+		if(dateparts[datepos].size()==4 && foundyear==false)
+		{
+			if(Convert(dateparts[datepos],year))
+			{
+				foundyear=true;
+			}
+			datepos++;
+		}
+		else if((dateparts[datepos].size()==1 || dateparts[datepos].size()==2))
+		{
+			if(foundyear==true && foundmonth==false)
+			{
+				if(Convert(dateparts[datepos],month))
+				{
+					if(month>=1 && month<=12)
+					{
+						foundmonth=true;
+					}
+					else
+					{
+						foundmonth=0;
+					}
+				}
+			}
+			else if(foundyear==true && foundmonth==true && foundday==false)
+			{
+				if(Convert(dateparts[datepos],day))
+				{
+					if(day>=1 && day<=31)
+					{
+						foundday=true;
+					}
+					else
+					{
+						foundday=0;
+					}
+				}
+			}
+			else if(foundyear==true && foundmonth==true && foundday==true && foundhour==false)
+			{
+				if(Convert(dateparts[datepos],hour))
+				{
+					if(hour>=0 && hour<=24)
+					{
+						foundhour=true;
+					}
+					else
+					{
+						foundhour=0;
+					}
+				}
+			}
+			else if(foundyear==true && foundmonth==true && foundday==true && foundhour==true && foundminute==false)
+			{
+				if(Convert(dateparts[datepos],minute))
+				{
+					if(minute>=0 && minute<60)
+					{
+						foundminute=true;
+					}
+					else
+					{
+						foundminute=0;
+					}
+				}
+			}
+			else if(foundyear==true && foundmonth==true && foundday==true && foundhour==true && foundminute==true && foundsecond==false)
+			{
+				if(Convert(dateparts[datepos],second))
+				{
+					if(second>=0 && second<60)
+					{
+						foundsecond=true;
+					}
+					else
+					{
+						foundsecond=0;
+					}
+				}
+			}
+			datepos++;
+		}
+		else
+		{
+			datepos++;
+		}
+	}
+
+	if(foundyear==true && foundmonth==true && foundday==true)
+	{
+		date.Set(year,month,day,hour,minute,second);
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+
 }

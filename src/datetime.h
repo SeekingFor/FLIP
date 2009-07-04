@@ -34,7 +34,11 @@ public:
 	const bool operator>(const DateTime &rhs) const;
 	const bool operator>=(const DateTime &rhs) const;
 
+	static const bool TryParse(const std::string &datestring, DateTime &date);
+
 private:
+	static const bool Convert(const std::string &input, int &output);
+
 	struct tm m_tm;
 };
 
