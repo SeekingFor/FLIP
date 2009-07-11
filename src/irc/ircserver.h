@@ -29,6 +29,7 @@ public:
 
 private:
 	void SendChannelMessageToClients(const int identityid, const std::string &channel, const std::string &message);
+	void SendPrivateMessageToClients(const int identityid, const std::string &recipient, const std::string &encryptedmessage);
 	void SendPartMessageToClients(const int identityid, const std::string &channel);
 
 	struct idinfo

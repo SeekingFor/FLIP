@@ -30,7 +30,7 @@ public:
 	void Process();
 
 private:
-	void RequestMessageEdition(const DateTime &date, const int identityid, const int edition);
+	void RequestMessageEdition(const DateTime &date, const int identityid, const int edition, const int priority=-1);
 
 	std::string m_messagebase;
 

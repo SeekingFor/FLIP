@@ -29,23 +29,25 @@ public:
 		REG_USER=2
 	};
 
-	int &Registered()						{ return m_registered; }
-	const int Registered() const			{ return m_registered; }
+	int &Registered()							{ return m_registered; }
+	const int Registered() const				{ return m_registered; }
 
-	std::string &Nick()						{ return m_nick; }
-	const std::string &Nick() const			{ return m_nick; }
-	std::string &User()						{ return m_user; }
-	const std::string &User() const			{ return m_user; }
-	std::string &Host()						{ return m_host; }
-	const std::string &Host() const			{ return m_host; }
-	std::string &RealName()					{ return m_realname; }
-	const std::string &RealName() const		{ return m_realname; }
+	std::string &Nick()							{ return m_nick; }
+	const std::string &Nick() const				{ return m_nick; }
+	std::string &User()							{ return m_user; }
+	const std::string &User() const				{ return m_user; }
+	std::string &Host()							{ return m_host; }
+	const std::string &Host() const				{ return m_host; }
+	std::string &RealName()						{ return m_realname; }
+	const std::string &RealName() const			{ return m_realname; }
 	const std::set<std::string> &JoinedChannels() const	{ return m_joinedchannels; }
 	std::set<std::string> &JoinedChannels()				{ return m_joinedchannels; }
-	int &DBID()								{ return m_dbid; }
-	const int DBID() const					{ return m_dbid; }
-	std::string &PublicKey()				{ return m_publickey; }
-	const std::string &PublicKey() const	{ return m_publickey; }
+	int &DBID()									{ return m_dbid; }
+	const int DBID() const						{ return m_dbid; }
+	std::string &PublicKey()					{ return m_publickey; }
+	const std::string &PublicKey() const		{ return m_publickey; }
+	std::string &RSAPrivateKey()				{ return m_rsaprivatekey; }
+	const std::string &RSAPrivateKey() const	{ return m_rsaprivatekey; }
 
 private:
 	const bool HandleReceivedData();
@@ -64,6 +66,7 @@ private:
 	std::string m_host;
 	std::string m_realname;
 	std::string m_publickey;
+	std::string m_rsaprivatekey;
 };
 
 #endif	// _ircclientconnection_

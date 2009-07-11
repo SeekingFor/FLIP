@@ -129,7 +129,7 @@ void FreenetIdentityAnnouncer::Process()
 
 		for(std::map<int,idinfo>::iterator i=m_ids.begin(); i!=m_ids.end(); i++)
 		{
-			if((*i).second.m_active && ((*i).second.m_announcing==false && ((*i).second.m_lastannounced<sixhourspassed) || (*i).second.m_lastannounced.Day()!=now.Day()))
+			if((*i).second.m_active && (*i).second.m_announcing==false && ((*i).second.m_lastannounced<sixhourspassed || (*i).second.m_lastannounced.Day()!=now.Day()))
 			{
 				StartInsert((*i).first);
 			}

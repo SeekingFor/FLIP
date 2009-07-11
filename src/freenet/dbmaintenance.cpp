@@ -23,7 +23,7 @@ void DBMaintenance::Do1DayMaintenance()
 
 	SQLite3DB::Statement st=m_db->Prepare("DELETE FROM tblIdentity WHERE (DateAdded<? AND LastSeen IS NULL) OR LastSeen<?;");
 	st.Bind(0,tendaysago.Format("%Y-%m-%d"));
-	st.Bind(0,tendaysago.Format("%Y-%m-%d"));
+	st.Bind(1,tendaysago.Format("%Y-%m-%d"));
 	st.Step();
 
 	st=m_db->Prepare("DELETE FROM tblAnnounceIndex WHERE Date<?;");
@@ -43,6 +43,8 @@ void DBMaintenance::Do1DayMaintenance()
 	st.Step();
 
 	m_db->Execute("COMMIT;");
+
+	m_log->Error("DBMaintenance::Do1DayMaintenance");
 }
 
 void DBMaintenance::Do6HoursMaintenance()

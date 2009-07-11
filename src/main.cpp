@@ -4,17 +4,44 @@
 #include "optionssetup.h"
 #include "irc/ircserver.h"
 #include "freenet/freenetconnection.h"
+#include "rsakeypair.h"
 
 #include <cstdio>
 
+void creatersakeypairs(SQLite3DB::DB *db)
+{
+	SQLite3DB::Statement updatest=db->Prepare("UPDATE tblLocalIdentity SET RSAPublicKey=?, RSAPrivateKey=? WHERE LocalIdentityID=?;");
+	SQLite3DB::Statement st=db->Prepare("SELECT LocalIdentityID FROM tblLocalIdentity WHERE RSAPrivateKey IS NULL OR RSAPrivateKey='';");
+	st.Step();
+	while(st.RowReturned())
+	{
+		int localidentityid=0;
+		RSAKeyPair rsa;
+		rsa.Generate();
+
+		st.ResultInt(0,localidentityid);
+
+		updatest.Bind(0,rsa.GetEncodedPublicKey());
+		updatest.Bind(1,rsa.GetEncodedPrivateKey());
+		updatest.Bind(2,localidentityid);
+		updatest.Step();
+		updatest.Reset();
+
+		st.Step();
+	}
+}
+
 int main()
 {
+
 	int loglevel=LogFile::LOGLEVEL_DEBUG;
 	Option option;
 	global::db.Open("flip.db3");
 
 	SetupDB(&global::db);
 	SetupDefaultOptions(&global::db);
+
+	creatersakeypairs(&global::db);
 
 	IRCServer irc;
 	FreenetConnection fn;

@@ -37,12 +37,12 @@ IRCCommand::IRCCommand(const std::string &commandstring)
 			textparam=commandparts[pos];
 		}
 		// end of text param :
-		else if(intextparam==true && commandparts[pos].size()>0 && commandparts[pos][commandparts[pos].size()-1]==':')
-		{
-			textparam+=" "+commandparts[pos];
-			m_parameters.push_back(textparam);
-			intextparam=false;
-		}
+		//else if(intextparam==true && commandparts[pos].size()>0 && commandparts[pos][commandparts[pos].size()-1]==':')
+		//{
+		//	textparam+=" "+commandparts[pos];
+		//	m_parameters.push_back(textparam);
+		//	intextparam=false;
+		//}
 		// middle of text param
 		else if(intextparam==true)
 		{

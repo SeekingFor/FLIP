@@ -6,7 +6,8 @@
 FreenetMessageEditionPoller::FreenetMessageEditionPoller(FreenetConnection *connection, FCPv2::Connection *fcp):IFCPConnected(fcp,connection),IFCPMessageHandler(connection,"MessageEditionPoller"),IPeriodicProcessor(connection)
 {
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_IDENTITYFOUND,this);
-	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_NEWMESSAGE,this);
+	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_NEWCHANNELMESSAGE,this);
+	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_NEWPRIVATEMESSAGE,this);
 
 	Option option;
 	option.Get("MessageBase",m_messagebase);
@@ -72,7 +73,7 @@ const bool FreenetMessageEditionPoller::HandleFLIPEvent(const FLIPEvent &flipeve
 
 		if(today==date && m_lastmessageedition[date][identityid]>=0)
 		{
-			RequestMessageEdition(date,identityid,m_lastmessageedition[date][identityid]+1);
+			RequestMessageEdition(date,identityid,m_lastmessageedition[date][identityid]+1,3);
 			RequestMessageEdition(date,identityid,m_lastmessageedition[date][identityid]+10);
 			RequestMessageEdition(date,identityid,m_lastmessageedition[date][identityid]+25);
 
@@ -85,7 +86,7 @@ const bool FreenetMessageEditionPoller::HandleFLIPEvent(const FLIPEvent &flipeve
 
 	}
 	// we retrieved a new message - poll once for the next message edition
-	else if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_NEWMESSAGE)
+	else if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_NEWCHANNELMESSAGE || flipevent.GetType()==FLIPEvent::EVENT_FREENET_NEWPRIVATEMESSAGE)
 	{
 		DateTime date;
 		int edition=0;
@@ -103,7 +104,7 @@ const bool FreenetMessageEditionPoller::HandleFLIPEvent(const FLIPEvent &flipeve
 		{
 			if(edition>=m_lastmessageedition[date][identityid])
 			{
-				RequestMessageEdition(date,identityid,m_lastmessageedition[date][identityid]+1);
+				RequestMessageEdition(date,identityid,m_lastmessageedition[date][identityid]+1,2);
 			}
 		}
 		else
@@ -153,10 +154,11 @@ void FreenetMessageEditionPoller::Process()
 	}
 }
 
-void FreenetMessageEditionPoller::RequestMessageEdition(const DateTime &date, const int identityid, const int edition)
+void FreenetMessageEditionPoller::RequestMessageEdition(const DateTime &date, const int identityid, const int edition, const int priority)
 {
 	std::string editionstr("0");
 	std::string identityidstr("");
+	std::string prioritystr("");
 
 	if(m_ids.find(identityid)==m_ids.end() || m_ids[identityid].m_publickey=="")
 	{
@@ -171,6 +173,7 @@ void FreenetMessageEditionPoller::RequestMessageEdition(const DateTime &date, co
 
 	StringFunctions::Convert(edition,editionstr);
 	StringFunctions::Convert(identityid,identityidstr);
+	StringFunctions::Convert(priority,prioritystr);
 
 	if(m_ids[identityid].m_publickey!="")
 	{
@@ -179,6 +182,10 @@ void FreenetMessageEditionPoller::RequestMessageEdition(const DateTime &date, co
 		mess["Identifier"]=m_fcpuniqueidentifier+"|"+identityidstr+"|"+date.Format("%Y-%m-%d")+"|"+editionstr;
 		mess["MaxSize"]="1024";
 		mess["ReturnType"]="none";
+		if(priority!=-1)
+		{
+			mess["PriorityClass"]=prioritystr;
+		}
 
 		m_fcp->Send(mess);
 		m_log->Debug("FreenetMessageEditionPoller::RequestMessageEdition polling for message for "+mess["Identifier"]);

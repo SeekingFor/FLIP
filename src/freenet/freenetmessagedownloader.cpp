@@ -6,6 +6,7 @@
 FreenetMessageDownloader::FreenetMessageDownloader(FreenetConnection *connection, FCPv2::Connection *fcp):IFCPConnected(fcp,connection),IFCPMessageHandler(connection,"MessageDownloader")
 {
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_NEWMESSAGEEDITION,this);
+	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_IDENTITYFOUND,this);
 
 	Option option;
 	option.Get("MessageBase",m_messagebase);
@@ -51,13 +52,26 @@ const bool FreenetMessageDownloader::HandleFCPMessage(FCPv2::Message &message)
 						// send message found event
 						std::map<std::string,std::string> params;
 
-						params["identityid"]=idparts[1];
-						params["channel"]=fm["channel"];
-						params["sentdate"]=fm["sentdate"];
-						params["message"]=fm.Body();
-						params["edition"]=idparts[3];
+						if(fm["type"]=="channelmessage")
+						{
+							params["identityid"]=idparts[1];
+							params["channel"]=fm["channel"];
+							params["sentdate"]=fm["sentdate"];
+							params["message"]=fm.Body();
+							params["edition"]=idparts[3];
 
-						DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_FREENET_NEWMESSAGE,params));
+							DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_FREENET_NEWCHANNELMESSAGE,params));
+						}
+						else if(fm["type"]=="privatemessage")
+						{
+							params["identityid"]=idparts[1];
+							params["recipient"]=fm["recipient"];
+							params["sentdate"]=fm["sentdate"];
+							params["encryptedmessage"]=fm.Body();
+							params["edition"]=idparts[3];
+
+							DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_FREENET_NEWPRIVATEMESSAGE,params));
+						}
 					}
 				}
 			}
@@ -126,7 +140,7 @@ const bool FreenetMessageDownloader::HandleFCPMessage(FCPv2::Message &message)
 
 const bool FreenetMessageDownloader::HandleFLIPEvent(const FLIPEvent &flipevent)
 {
-	if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_NEWMESSAGEEDITION)
+	if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_NEWMESSAGEEDITION || flipevent.GetType()==FLIPEvent::EVENT_FREENET_IDENTITYFOUND)
 	{
 		int lastedition=0;
 		int newedition=0;
@@ -143,7 +157,15 @@ const bool FreenetMessageDownloader::HandleFLIPEvent(const FLIPEvent &flipevent)
 		if(st.RowReturned())
 		{
 			st.ResultInt(0,lastedition);
-			StringFunctions::Convert(params["edition"],newedition);
+
+			if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_NEWMESSAGEEDITION)
+			{
+				StringFunctions::Convert(params["edition"],newedition);
+			}
+			else if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_IDENTITYFOUND)
+			{
+				StringFunctions::Convert(params["lastmessageindex"],newedition);
+			}
 
 			st=m_db->Prepare("SELECT PublicKey FROM tblIdentity WHERE IdentityID=?;");
 			st.Bind(0,params["identityid"]);

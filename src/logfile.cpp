@@ -2,6 +2,7 @@
 
 #include <ctime>
 #include <cstdarg>
+#include <cstdio>
 
 #ifdef XMEM
 	#include <xmem.h>

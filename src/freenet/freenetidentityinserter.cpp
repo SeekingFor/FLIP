@@ -119,6 +119,7 @@ const bool FreenetIdentityInserter::HandleFLIPEvent(const FLIPEvent &flipevent)
 
 void FreenetIdentityInserter::Process()
 {
+	DateTime now;
 	DateTime tenminutespassed;
 	tenminutespassed.Add(0,-10);
 	if(m_activeids.size()>0 && (m_inserting==false || m_lastactivity<tenminutespassed))
@@ -139,8 +140,8 @@ void FreenetIdentityInserter::Process()
 			}
 		}
 
-		// only insert id every 10 minutes
-		if(lastdate<tenminutespassed)
+		// only insert id every 10 minutes, or if date has changed
+		if(lastdate<tenminutespassed || lastdate.Day()!=now.Day())
 		{
 			StartIDInsert(id);
 		}
@@ -171,6 +172,7 @@ void FreenetIdentityInserter::StartIDInsert(const int id)
 		std::string idstr("");
 		std::string datalengthstr("");
 		std::string lastindexstr("0");
+		std::string rsapublickey("");
 
 		SQLite3DB::Statement st=m_db->Prepare("SELECT IFNULL(MAX(MessageIndex),0) FROM tblInsertedMessageIndex WHERE LocalIdentityID=? AND Date=? AND Inserted=1;");
 		st.Bind(0,id);
@@ -181,9 +183,18 @@ void FreenetIdentityInserter::StartIDInsert(const int id)
 			st.ResultText(0,lastindexstr);
 		}
 
+		st=m_db->Prepare("SELECT RSAPublicKey FROM tblLocalIdentity WHERE LocalIdentityID=?;");
+		st.Bind(0,id);
+		st.Step();
+		if(st.RowReturned())
+		{
+			st.ResultText(0,rsapublickey);
+		}
+
 		FreenetMessage fm;
 		fm["name"]=m_activeids[id].m_name;
 		fm["lastmessageindex"]=lastindexstr;
+		fm["rsapublickey"]=rsapublickey;
 		data=fm.GetMessageText();
 
 		StringFunctions::Convert(id,idstr);

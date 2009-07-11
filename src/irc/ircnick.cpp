@@ -6,7 +6,8 @@ const bool IRCNick::IsValid(const std::string &nick)
 	static std::string trailingchars("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz[]\'_^{|}0123456789-");
 
 	// RFC 2812 says nick can't be longer than 9 chars
-	if(nick.size()>0 && nick.size()<10)
+	// allow up to 15 for now
+	if(nick.size()>0 && nick.size()<16)
 	{
 		if(beginchars.find(nick[0])==std::string::npos)
 		{

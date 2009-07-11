@@ -5,8 +5,9 @@
 #include "iperiodicprocessor.h"
 #include "../idatabase.h"
 #include "../datetime.h"
+#include "../ilogger.h"
 
-class DBMaintenance:public IDatabase,public IPeriodicProcessor
+class DBMaintenance:public IDatabase,public IPeriodicProcessor,public ILogger
 {
 public:
 	DBMaintenance(FreenetConnection *connection);

@@ -6,7 +6,7 @@
 
 #define FLIP_MAJOR		"0"
 #define FLIP_MINOR		"0"
-#define FLIP_RELEASE	"3"
+#define FLIP_RELEASE	"4"
 #define FLIP_VERSION	FLIP_MAJOR"."FLIP_MINOR"."FLIP_RELEASE
 
 namespace global

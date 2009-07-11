@@ -11,6 +11,7 @@ IF(APPLE)
 ENDIF(APPLE)
 
 SET(FLIP_SRC
+src/base64.cpp
 src/datetime.cpp
 src/dbsetup.cpp
 src/flipevent.cpp
@@ -20,6 +21,7 @@ src/logfile.cpp
 src/main.cpp
 src/option.cpp
 src/optionssetup.cpp
+src/rsakeypair.cpp
 src/stringfunctions.cpp
 src/db/sqlite3db/sqlite3db.cpp
 src/db/sqlite3db/sqlite3recordset.cpp
@@ -63,6 +65,14 @@ ENDFOREACH(SRC)
 
 ADD_EXECUTABLE(flip ${FLIP_SRC} ${FLIP_INC})
 
+ADD_SUBDIRECTORY(libs/librock)
+TARGET_LINK_LIBRARIES(flip librock)
+INCLUDE_DIRECTORIES(libs/librock)
+
+ADD_SUBDIRECTORY(libs/polarssl)
+TARGET_LINK_LIBRARIES(flip polarssl)
+INCLUDE_DIRECTORIES(libs/polarssl/include)
+
 # link dl - For SQLite3 - not for FreeBSD
 IF(CMAKE_COMPILER_IS_GNUCC)
 	IF(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
@@ -82,10 +92,6 @@ ENDIF(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
 IF(WIN32)
 	TARGET_LINK_LIBRARIES(flip ws2_32)
 	TARGET_LINK_LIBRARIES(flip iphlpapi)
-ELSE(WIN32)
-	ADD_SUBDIRECTORY(libs/librock)
-	TARGET_LINK_LIBRARIES(flip librock)
-	INCLUDE_DIRECTORIES(libs/librock)
 ENDIF(WIN32)
 
 # add -lxnet and -lsocket on solaris

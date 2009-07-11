@@ -26,7 +26,10 @@ public:
 	const bool HandleFLIPEvent(const FLIPEvent &flipevent);
 
 private:
-	void StartInsert(const int localidentityid, const std::string &channel, const std::string &message);
+	void StartChannelInsert(const int localidentityid, const std::string &channel, const std::string &message);
+	void StartPrivateInsert(const int localidentityid, const int recipientidentityid, const std::string &message);
+	void LoadLocalIdentityPrivateKey(const int localidentityid);
+	const int GetNextMessageIndex(const int localidentityid, const DateTime &date);
 
 	std::string m_messagebase;
 	std::map<int,std::string> m_identitykeys;

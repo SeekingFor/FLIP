@@ -67,10 +67,11 @@ const bool FreenetIdentityRequester::HandleFCPMessage(FCPv2::Message &message)
 				{
 					if(IRCNick::IsValid(fm["name"]))
 					{
-						st=m_db->Prepare("UPDATE tblIdentity SET Name=?, LastSeen=? WHERE IdentityID=?;");
+						st=m_db->Prepare("UPDATE tblIdentity SET Name=?, LastSeen=?, RSAPublicKey=? WHERE IdentityID=?;");
 						st.Bind(0,fm["name"]);
 						st.Bind(1,now.Format("%Y-%m-%d %H:%M:%S"));
-						st.Bind(2,identityid);
+						st.Bind(2,fm["rsapublickey"]);
+						st.Bind(3,identityid);
 						st.Step();
 
 						std::map<std::string,std::string> eventparams;
