@@ -763,6 +763,7 @@ void IRCServer::Update(const unsigned long ms)
 			{
 				std::map<std::string,std::string> params;
 				StringFunctions::Convert((*i)->DBID(),params["localidentityid"]);
+				(*i)->LastActivity().SetNowUTC();
 				DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_IRC_KEEPALIVE,params));
 			}
 			i++;
