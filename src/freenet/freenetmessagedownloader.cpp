@@ -55,9 +55,10 @@ const bool FreenetMessageDownloader::HandleFCPMessage(FCPv2::Message &message)
 						if(fm["type"]=="channelmessage")
 						{
 							params["identityid"]=idparts[1];
-							params["channel"]=fm["channel"];
+							StringFunctions::LowerCase(fm["channel"],params["channel"]);
 							params["sentdate"]=fm["sentdate"];
 							params["message"]=fm.Body();
+							params["insertday"]=idparts[2];
 							params["edition"]=idparts[3];
 
 							DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_FREENET_NEWCHANNELMESSAGE,params));
@@ -68,9 +69,38 @@ const bool FreenetMessageDownloader::HandleFCPMessage(FCPv2::Message &message)
 							params["recipient"]=fm["recipient"];
 							params["sentdate"]=fm["sentdate"];
 							params["encryptedmessage"]=fm.Body();
+							params["insertday"]=idparts[2];
 							params["edition"]=idparts[3];
 
 							DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_FREENET_NEWPRIVATEMESSAGE,params));
+						}
+						else if(fm["type"]=="joinchannel")
+						{
+							params["identityid"]=idparts[1];
+							StringFunctions::LowerCase(fm["channel"],params["channel"]);
+							params["sentdate"]=fm["sentdate"];
+							params["insertday"]=idparts[2];
+							params["edition"]=idparts[3];
+
+							DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_FREENET_JOINCHANNEL,params));
+						}
+						else if(fm["type"]=="partchannel")
+						{
+							params["identityid"]=idparts[1];
+							StringFunctions::LowerCase(fm["channel"],params["channel"]);
+							params["sentdate"]=fm["sentdate"];
+							params["insertday"]=idparts[2];
+							params["edition"]=idparts[3];
+
+							DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_FREENET_PARTCHANNEL,params));
+						}
+						else if(fm["type"]=="keepalive")
+						{
+							// we don't need to do anything for a keepalive message
+						}
+						else
+						{
+							m_log->Debug("FreenetMessageDownloader::HandleFCPMessage don't know how to handle "+fm["type"]+" for "+message["Identifier"]);
 						}
 					}
 				}

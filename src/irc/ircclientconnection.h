@@ -6,6 +6,7 @@
 
 #include "irccommandhandler.h"
 #include "../ilogger.h"
+#include "../datetime.h"
 
 class IRCClientConnection:public ILogger
 {
@@ -48,6 +49,8 @@ public:
 	const std::string &PublicKey() const		{ return m_publickey; }
 	std::string &RSAPrivateKey()				{ return m_rsaprivatekey; }
 	const std::string &RSAPrivateKey() const	{ return m_rsaprivatekey; }
+	DateTime &LastActivity()					{ return m_lastactivity; }
+	const DateTime &LastActivity() const		{ return m_lastactivity; }
 
 private:
 	const bool HandleReceivedData();
@@ -67,6 +70,7 @@ private:
 	std::string m_realname;
 	std::string m_publickey;
 	std::string m_rsaprivatekey;
+	DateTime m_lastactivity;
 };
 
 #endif	// _ircclientconnection_

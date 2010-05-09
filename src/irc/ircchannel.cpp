@@ -1,8 +1,37 @@
 #include "ircchannel.h"
+#include "../stringfunctions.h"
 
-const bool IRCChannel::IsValid(const std::string &name)
+std::string IRCChannel::m_prefix="&+#!";
+
+IRCChannel::IRCChannel():m_type(TYPE_STANDARD),m_mode(0),m_topicset(false),m_topic(""),m_name("")
 {
-	static const std::string invalidchars("\x00\x07\x0a\x0d ,:");
 
-	return (name.find_first_of(invalidchars)==std::string::npos);
+}
+
+const bool IRCChannel::SetName(const std::string &name)
+{
+	if(ValidName(name)==true)
+	{
+		if(name.find_first_of(m_prefix)==0)
+		{
+			StringFunctions::LowerCase(name.substr(1),m_name);
+			SetType(m_prefix.find(name[0]));
+		}
+		else
+		{
+			StringFunctions::LowerCase(name,m_name);
+		}
+		return true;
+	}
+	else
+	{
+		return false;	
+	}
+}
+
+const bool IRCChannel::ValidName(const std::string &name)
+{
+	static std::string invalidchars("\x00\x07\x0a\x0d ,:");
+	
+	return (name.find_first_of(invalidchars)==std::string::npos && name.size()>0);
 }

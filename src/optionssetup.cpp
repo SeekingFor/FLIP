@@ -135,6 +135,22 @@ void SetupDefaultOptions(SQLite3DB::DB *db)
 	upd.Step();
 	upd.Reset();
 
+	st.Bind(0,"MessageInsertPriority");
+	st.Bind(1,"2");
+	st.Step();
+	st.Reset();
+	upd.Bind(0,"Messages");
+	upd.Bind(1,order++);
+	upd.Bind(2);
+	upd.Bind(3,"0|0|1|1|2|2|3|3|4|4|5|5|6|6");
+	upd.Bind(4,"select");
+	upd.Bind(5);
+	upd.Bind(6);
+	upd.Bind(7,"advanced");
+	upd.Bind(8,"MessageInsertPriority");
+	upd.Step();
+	upd.Reset();
+
 	db->Execute("COMMIT;");
 
 }

@@ -15,7 +15,7 @@
 IRCClientConnection::IRCClientConnection(const int sock, IRCCommandHandler *commandhandler):m_socket(sock)
 ,m_commandhandler(commandhandler),m_tempbuffer(4096,0),m_registered(0),m_nick(""),m_user(""),m_realname(""),m_host("freenet"),m_publickey(""),m_rsaprivatekey("")
 {
-
+	m_lastactivity.SetNowUTC();
 }
 
 const bool IRCClientConnection::Disconnect()

@@ -39,6 +39,8 @@ IRCServer::IRCServer():m_servername("flip")
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_NEWCHANNELMESSAGE,this);
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_NEWPRIVATEMESSAGE,this);
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_IDENTITYINACTIVE,this);
+	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_JOINCHANNEL,this);
+	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_PARTCHANNEL,this);
 }
 
 IRCServer::~IRCServer()
@@ -119,13 +121,14 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_WELCOME,client->Nick(),":Welcome to the Freenet IRC network"));
 				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_YOURHOST,client->Nick(),":Your host is "+m_servername+" running version "+FLIP_VERSION));
 				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_CREATED,client->Nick(),":This server was created "+m_datestarted.Format("%Y-%m-%d")));
-				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_MYINFO,client->Nick(),":Empty for now"));
+				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_MYINFO,client->Nick(),m_servername+" "+FLIP_VERSION+" s v"));
 				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_USERHOST,client->Nick(),":"+client->Nick()+"=-n="+client->User()+"@freenet"));
 
 				std::map<std::string,std::string> params;
 				params["nick"]=client->Nick();
 				StringFunctions::Convert(client->DBID(),params["localidentityid"]);
 
+				client->LastActivity().SetNowUTC();
 				DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_IRC_USERREGISTER,params));
 			}
 			else
@@ -143,11 +146,13 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 
 			for(std::vector<std::string>::iterator i=channels.begin(); i!=channels.end(); i++)
 			{
-				if((*i).size()>0 && (*i)[0]=='#' && IRCChannel::IsValid((*i)))
+				if((*i).size()>0 && (*i)[0]=='#' && IRCChannel::ValidName((*i)))
 				{
 					std::string joinednicks(client->Nick());
+					IRCChannel chan;
+					chan.SetName((*i));
 
-					for(std::set<int>::iterator j=m_idchannels[(*i)].begin(); j!=m_idchannels[(*i)].end(); j++)
+					for(std::set<int>::iterator j=m_idchannels[chan.GetName()].begin(); j!=m_idchannels[chan.GetName()].end(); j++)
 					{
 						if(m_ids[(*j)].m_nick!="" && m_ids[(*j)].m_publickey!=client->PublicKey())
 						{
@@ -157,18 +162,19 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 						}
 					}
 
-					client->SendCommand(IRCCommand(":"+client->Nick()+"!n="+client->User()+"@freenet JOIN :"+(*i)));
-					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_NOTOPIC,client->Nick(),(*i)+" :No topic set"));
-					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_NAMREPLY,client->Nick()," = "+(*i)+" :"+joinednicks));
-					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_ENDOFNAMES,client->Nick()," "+(*i)+" :End of names"));
+					client->SendCommand(IRCCommand(":"+client->Nick()+"!n="+client->User()+"@freenet JOIN :"+chan.GetName()));
+					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_NOTOPIC,client->Nick(),chan.GetName()+" :No topic set"));
+					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_NAMREPLY,client->Nick()," = "+chan.GetName()+" :"+joinednicks));
+					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_ENDOFNAMES,client->Nick()," "+chan.GetName()+" :End of names"));
 
-					client->JoinedChannels().insert((*i));
+					client->JoinedChannels().insert(chan.GetName());
 
 					std::map<std::string,std::string> params;
 					params["nick"]=client->Nick();
 					StringFunctions::Convert(client->DBID(),params["localidentityid"]);
-					params["channel"]=(*i);
+					params["channel"]=chan.GetName();
 
+					client->LastActivity().SetNowUTC();
 					DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_IRC_JOINCHANNEL,params));
 				}
 			}
@@ -184,7 +190,7 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 
 			for(std::vector<std::string>::iterator i=channels.begin(); i!=channels.end(); i++)
 			{
-				if((*i).size()>0 && (*i)[0]=='#' && IRCChannel::IsValid((*i)))
+				if((*i).size()>0 && (*i)[0]=='#' && IRCChannel::ValidName((*i)))
 				{
 					if(client->JoinedChannels().find((*i))!=client->JoinedChannels().end())
 					{
@@ -197,6 +203,7 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 						StringFunctions::Convert(client->DBID(),params["localidentityid"]);
 						params["channel"]=(*i);
 
+						client->LastActivity().SetNowUTC();
 						DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_IRC_PARTCHANNEL,params));
 					}
 				}
@@ -208,9 +215,13 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 		if(command.GetParameters().size()>1)
 		{
 			// message to channel
-			if(command.GetParameters()[0].size()>0 && command.GetParameters()[0][0]=='#' && IRCChannel::IsValid(command.GetParameters()[0]))
+			if(command.GetParameters()[0].size()>0 && command.GetParameters()[0][0]=='#' && IRCChannel::ValidName(command.GetParameters()[0]))
 			{
+				IRCChannel chan;
 				std::string message("");
+
+				chan.SetName(command.GetParameters()[0]);
+
 				std::vector<std::string>::const_iterator i=(command.GetParameters().begin()+1);
 				if((*i).size()>0 && (*i)[0]==':')
 				{
@@ -226,8 +237,9 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 				params["nick"]=client->Nick();
 				StringFunctions::Convert(client->DBID(),params["localidentityid"]);
 				params["message"]=message;
-				params["channel"]=command.GetParameters()[0];
+				params["channel"]=chan.GetName();
 
+				client->LastActivity().SetNowUTC();
 				DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_IRC_CHANNELMESSAGE,params));
 			}
 			// message to another user
@@ -257,10 +269,45 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 					params["recipientidentityid"]=nickparts[nickparts.size()-1];
 				}
 
+				client->LastActivity().SetNowUTC();
 				DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_IRC_PRIVATEMESSAGE,params));
 
 			}
 		}
+	}
+	else if(command.GetCommand()=="LIST")
+	{
+		// list all channels
+		if(command.GetParameters().size()==0 || (command.GetParameters().size()>0 && command.GetParameters()[0].size()==0) )
+		{
+			for(std::map<std::string,std::set<int> >::iterator i=m_idchannels.begin(); i!=m_idchannels.end(); i++)
+			{
+				std::string countstr("0");
+				StringFunctions::Convert((*i).second.size(),countstr);
+				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_LIST,client->Nick(),(*i).first+" "+countstr+" :"));
+			}
+		}
+		// list only specific channels
+		else
+		{
+			std::vector<std::string> channels;
+			StringFunctions::Split(command.GetParameters()[0],",",channels);
+			for(std::vector<std::string>::iterator i=channels.begin(); i!=channels.end(); i++)
+			{
+				if(IRCChannel::ValidName((*i))==true)
+				{
+					IRCChannel chan;
+					chan.SetName((*i));
+					std::string countstr("0");
+					if(m_idchannels.find(chan.GetName())!=m_idchannels.end())
+					{
+						StringFunctions::Convert((*m_idchannels.find(chan.GetName())).second.size(),countstr);
+					}
+					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_LIST,client->Nick(),chan.GetName()+" "+countstr+" :"));
+				}
+			}
+		}
+		client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_LISTEND,client->Nick(),":End of list"));
 	}
 	else if(command.GetCommand()=="PING")
 	{
@@ -277,65 +324,163 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 			client->SendCommand(":"+m_servername+" PONG "+m_servername+" "+command.GetParameters()[0]);
 		}
 	}
+	else if(command.GetCommand()=="QUIT")
+	{
+		//Just disconnect client here - Update method will take care of cleaning up the connection
+		client->Disconnect();
+	}
 
 	return true;
 }
 
 const bool IRCServer::HandleFLIPEvent(const FLIPEvent &flipevent)
 {
-	if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_NEWCHANNELMESSAGE || flipevent.GetType()==FLIPEvent::EVENT_FREENET_NEWPRIVATEMESSAGE)
+	std::map<std::string,std::string> params=flipevent.GetParameters();
+	int identityid=0;
+	DateTime sentdate;
+	DateTime insertday;
+	DateTime thirtyminutesago;
+	DateTime fiveminutesfromnow;
+	DateTime now;
+
+	thirtyminutesago.Add(0,-30);
+	fiveminutesfromnow.Add(0,5);
+
+	StringFunctions::Convert(params["identityid"],identityid);
+
+	// First make sure the sent date is valid and if we haven't already seen a message from this id
+	// make sure that the message is from the past 30 minutes, otherwise discard the message
+	if(DateTime::TryParse(params["sentdate"],sentdate))
 	{
-		std::map<std::string,std::string> params=flipevent.GetParameters();
-		int identityid=0;
-		DateTime sentdate;
-		DateTime thirtyminutesago;
-		DateTime fiveminutesfromnow;
-
-		thirtyminutesago.Add(0,-30);
-		fiveminutesfromnow.Add(0,5);
-
-		StringFunctions::Convert(params["identityid"],identityid);
-
-		if(DateTime::TryParse(params["sentdate"],sentdate))
+		if(m_idhassent.find(identityid)!=m_idhassent.end() || (sentdate>=thirtyminutesago && sentdate<=fiveminutesfromnow))
 		{
-
-			if((m_idhassent.find(identityid)!=m_idhassent.end()) || (sentdate>=thirtyminutesago && sentdate<=fiveminutesfromnow))
-			{
-				if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_NEWCHANNELMESSAGE)
-				{
-					SendChannelMessageToClients(identityid,params["channel"],params["message"]);
-				}
-				else if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_NEWPRIVATEMESSAGE)
-				{
-					SendPrivateMessageToClients(identityid,params["recipient"],params["encryptedmessage"]);
-				}
-				m_idhassent.insert(identityid);
-			}
-
+			m_idhassent.insert(identityid);
 		}
 		else
 		{
-			m_log->Debug("IRCServer::HandleFLIPEvent error parsing date "+params["sentdate"]);
+			// message older than 30 minutes get silently discarded
+			return false;
 		}
-		return true;
 	}
-	else if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_IDENTITYINACTIVE)
+	else
+	{
+		m_log->Debug("IRCServer::HandleFLIPEvent error parsing date "+params["sentdate"]);
+		return false;
+	}
+
+	DateTime::TryParse(params["insertday"],insertday);
+	insertday.Set(insertday.Year(),insertday.Month(),insertday.Day(),0,0,0);
+
+	// Make sure we have the name the public key of the identity
+	if(m_ids.find(identityid)==m_ids.end())
+	{
+		SQLite3DB::Statement st=m_db->Prepare("SELECT Name, PublicKey FROM tblIdentity WHERE IdentityID=?;");
+		st.Bind(0,identityid);
+		st.Step();
+		if(st.RowReturned())
+		{
+			st.ResultText(0,m_ids[identityid].m_nick);
+			st.ResultText(1,m_ids[identityid].m_publickey);
+		}
+	}
+
+	// The sent date is OK, and we do want to handle this message
+	// Now make sure that the edition of the message is one after the last edition
+	// we already received.  Otherwise we will queue the message up to x seconds to
+	// wait for the missing edition(s)
+
+	int thisedition=0;
+	int lastedition=-1;
+	StringFunctions::Convert(params["edition"],thisedition);
+	if(m_ids[identityid].m_lastdayedition.find(insertday)!=m_ids[identityid].m_lastdayedition.end())
+	{
+		lastedition=m_ids[identityid].m_lastdayedition[insertday];
+	}
+	else
+	{
+		lastedition=thisedition-1;
+	}
+
+	if(thisedition<=lastedition+1)
+	{
+		ProcessFLIPEvent(identityid,flipevent);
+	}
+	else
+	{
+		m_ids[identityid].m_messagequeue.insert(idinfo::messagequeueitem(flipevent,thisedition,insertday,now));
+	}
+
+	return true;
+
+}
+
+void IRCServer::ProcessFLIPEvent(const int identityid, const FLIPEvent &flipevent)
+{
+	DateTime sentdate;
+	DateTime insertday;
+	std::map<std::string,std::string> params=flipevent.GetParameters();
+	int edition=0;
+
+	DateTime::TryParse(params["insertday"],insertday);
+	insertday.Set(insertday.Year(),insertday.Month(),insertday.Day(),0,0,0);
+	DateTime::TryParse(params["sentdate"],sentdate);
+	StringFunctions::Convert(params["edition"],edition);
+	if(m_ids[identityid].m_lastdayedition[insertday]<edition)
+	{
+		m_ids[identityid].m_lastdayedition[insertday]=edition;
+	}
+
+	if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_NEWCHANNELMESSAGE)
+	{
+		SendChannelMessageToClients(identityid,params["channel"],params["message"]);
+	}
+	else if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_NEWPRIVATEMESSAGE)
+	{
+		SendPrivateMessageToClients(identityid,params["recipient"],params["encryptedmessage"]);
+	}
+	else if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_IDENTITYINACTIVE || flipevent.GetType()==FLIPEvent::EVENT_FREENET_PARTCHANNEL)
 	{
 		// send part command to connected clients
-		int identityid=0;
-		std::map<std::string,std::string> params=flipevent.GetParameters();
-		StringFunctions::Convert(params["identityid"],identityid);
-
 		for(std::map<std::string,std::set<int> >::iterator i=m_idchannels.begin(); i!=m_idchannels.end(); i++)
 		{
 			if((*i).second.find(identityid)!=(*i).second.end())
 			{
 				SendPartMessageToClients(identityid,(*i).first);
+
 				(*i).second.erase(identityid);
 			}
 		}
 	}
-	return false;
+	else if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_JOINCHANNEL)
+	{
+		std::string idstr(params["identityid"]);
+
+		// send join command to connected clients
+		if(m_idchannels[params["channel"]].find(identityid)==m_idchannels[params["channel"]].end())
+		{
+			m_idchannels[params["channel"]].insert(identityid);
+
+			for(std::vector<IRCClientConnection *>::iterator i=m_clients.begin(); i!=m_clients.end(); i++)
+			{
+				if((*i)->PublicKey()=="")
+				{
+					SQLite3DB::Statement st=m_db->Prepare("SELECT PublicKey FROM tblLocalIdentity WHERE LocalIdentityID=?;");
+					st.Bind(0,(*i)->DBID());
+					st.Step();
+					if(st.RowReturned())
+					{
+						st.ResultText(0,(*i)->PublicKey());
+					}
+				}
+				// don't send join message if the client is the one that sent the message
+				if((*i)->PublicKey()!=m_ids[identityid].m_publickey && (*i)->JoinedChannels().find(params["channel"])!=(*i)->JoinedChannels().end())
+				{
+					(*i)->SendCommand(IRCCommand(":"+m_ids[identityid].m_nick+"_"+idstr+" JOIN "+params["channel"]));
+				}
+			}
+		}
+	}
+
 }
 
 void IRCServer::SendChannelMessageToClients(const int identityid, const std::string &channel, const std::string &message)
@@ -471,6 +616,17 @@ void IRCServer::SendPartMessageToClients(const int identityid, const std::string
 
 	for(std::vector<IRCClientConnection *>::iterator i=m_clients.begin(); i!=m_clients.end(); i++)
 	{
+		if((*i)->PublicKey()=="")
+		{
+			SQLite3DB::Statement st=m_db->Prepare("SELECT PublicKey FROM tblLocalIdentity WHERE LocalIdentityID=?;");
+			st.Bind(0,(*i)->DBID());
+			st.Step();
+			if(st.RowReturned())
+			{
+				st.ResultText(0,(*i)->PublicKey());
+			}
+		}
+
 		if((*i)->PublicKey()!=m_ids[identityid].m_publickey && (*i)->JoinedChannels().find(channel)!=(*i)->JoinedChannels().end())
 		{
 			(*i)->SendCommand(IRCCommand(":"+m_ids[identityid].m_nick+"_"+idstr+" PART "+channel));
@@ -600,6 +756,15 @@ void IRCServer::Update(const unsigned long ms)
 	{
 		if((*i)->IsConnected())
 		{
+			// send keepalive message if this client hasn't sent anything in the last 15 minutes
+			DateTime past;
+			past.Add(0,-15,0,0,0,0);
+			if((*i)->LastActivity()<past)
+			{
+				std::map<std::string,std::string> params;
+				StringFunctions::Convert((*i)->DBID(),params["localidentityid"]);
+				DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_IRC_KEEPALIVE,params));
+			}
 			i++;
 		}
 		else
@@ -613,6 +778,25 @@ void IRCServer::Update(const unsigned long ms)
 			m_log->Info("IRCServer::Update client connection deleted");
 			delete (*i);
 			i=m_clients.erase(i);
+		}
+	}
+
+	// process any queued events
+	for(std::map<int,idinfo>::iterator i=m_ids.begin(); i!=m_ids.end(); i++)
+	{
+		DateTime now;
+		DateTime xsecondsago;
+		xsecondsago.Add(-30,0,0,0,0,0);
+		if((*i).second.m_messagequeue.size()>0)
+		{
+			std::set<idinfo::messagequeueitem,idinfo::messagequeuecompare>::iterator mi=(*i).second.m_messagequeue.begin();
+			while(mi!=(*i).second.m_messagequeue.end() && ((*mi).m_edition<=(*i).second.m_lastdayedition[(*mi).m_insertday] || (*mi).m_arrivaltime<xsecondsago))
+			{
+				ProcessFLIPEvent((*i).first,(*mi).m_message);
+				(*i).second.m_messagequeue.erase(mi);
+				// gcc doesn't like assigning an iterator when erasing, so we have to do it this way
+				mi=(*i).second.m_messagequeue.begin();
+			}
 		}
 	}
 

@@ -21,7 +21,7 @@ void DBMaintenance::Do1DayMaintenance()
 
 	m_db->Execute("BEGIN;");
 
-	SQLite3DB::Statement st=m_db->Prepare("DELETE FROM tblIdentity WHERE (DateAdded<? AND LastSeen IS NULL) OR LastSeen<?;");
+	SQLite3DB::Statement st=m_db->Prepare("DELETE FROM tblIdentity WHERE (DateAdded<? AND LastSeen IS NULL) OR LastSeen<? AND Ignored=0;");
 	st.Bind(0,tendaysago.Format("%Y-%m-%d"));
 	st.Bind(1,tendaysago.Format("%Y-%m-%d"));
 	st.Step();
