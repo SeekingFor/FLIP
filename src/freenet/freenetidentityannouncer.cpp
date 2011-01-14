@@ -70,7 +70,7 @@ const bool FreenetIdentityAnnouncer::HandleFCPMessage(FCPv2::Message &message)
 			st.Bind(1,index);
 			st.Step();
 
-			m_log->Debug("FreenetIdentityAnnouncer::HandleFCPMessage putfailed "+message["Identifier"]);
+			m_log->Debug("FreenetIdentityAnnouncer::HandleFCPMessage PutFailed "+message["Identifier"]+"  Code="+message["Code"]+"  Description="+message["CodeDescription"]);
 			m_ids[id].m_announcing=false;
 			return true;
 		}
@@ -177,6 +177,7 @@ void FreenetIdentityAnnouncer::StartInsert(const int localidentityid)
 		FCPv2::Message mess("ClientPut");
 		mess["URI"]="KSK@"+m_messagebase+"|"+now.Format("%Y-%m-%d")+"|Announce|"+indexstr;
 		mess["Identifier"]=m_fcpuniqueidentifier+"|"+idstr+"|"+now.Format("%Y-%m-%d")+"|"+indexstr+"|"+mess["URI"];
+		mess["ExtraInsertsSingleBlock"]="0";
 		mess["UploadFrom"]="direct";
 		mess["DataLength"]=datalengthstr;
 

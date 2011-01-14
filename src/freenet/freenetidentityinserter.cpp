@@ -205,6 +205,7 @@ void FreenetIdentityInserter::StartIDInsert(const int id)
 		mess["Identifier"]=m_fcpuniqueidentifier+"|"+idstr+"|"+now.Format("%Y-%m-%d")+"|"+mess["URI"];
 		mess["UploadFrom"]="direct";
 		mess["DataLength"]=datalengthstr;
+		mess["Metadata.ContentType"]="";
 
 		m_fcp->Send(mess);
 		m_fcp->Send(std::vector<char>(data.begin(),data.end()));

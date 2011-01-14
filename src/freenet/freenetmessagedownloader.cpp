@@ -234,6 +234,7 @@ void FreenetMessageDownloader::StartRequest(const int identityid, const std::str
 	FCPv2::Message mess("ClientGet");
 	mess["URI"]="SSK@"+publickey.substr(4)+m_messagebase+"|"+date+"|Message-"+editionstr;
 	mess["Identifier"]=m_fcpuniqueidentifier+"|"+identityidstr+"|"+date+"|"+editionstr+"|"+mess["URI"];
+	mess["RealTimeFlag"]="true";
 	mess["ReturnType"]="direct";
 	mess["MaxSize"]="1024";
 

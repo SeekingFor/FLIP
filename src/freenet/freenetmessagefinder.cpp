@@ -220,6 +220,7 @@ void FreenetMessageFinder::Process()
 
 					std::map<std::string,std::string> params;
 					StringFunctions::Convert((*i).first,params["identityid"]);
+					params["sentdate"]=now.Format("%Y-%m-%d %H:%M:%S");
 					DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_FREENET_IDENTITYINACTIVE,params));
 				}
 			}

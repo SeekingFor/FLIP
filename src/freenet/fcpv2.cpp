@@ -314,7 +314,7 @@ const bool Connection::Receive(Message &message)
 	{
 		std::vector<std::string> fields;
 
-		Split(std::string(m_receivebuffer.begin(),endpos),"\n=",fields);
+		Split(std::string(m_receivebuffer.begin(),endpos),"\n",fields);
 		m_receivebuffer.erase(m_receivebuffer.begin(),endpos+endlen);
 
 		message.Clear();
@@ -326,17 +326,23 @@ const bool Connection::Receive(Message &message)
 
 		if(fields.size()>1)
 		{
-			for(std::vector<std::string>::iterator i=fields.begin()+1; i!=fields.end();)
+			for(std::vector<std::string>::iterator i=fields.begin()+1; i!=fields.end(); i++)
 			{
-				if(i+1!=fields.end())
+
+				std::string::size_type pos=(*i).find_first_of('=');
+
+				if(pos!=std::string::npos)
 				{
-					message.GetFields()[(*i)]=(*(i+1));
-					i+=2;
+					message.GetFields()[(*i).substr(0,pos)]=(*i).substr(pos+1);
 				}
 				else
 				{
-					i++;
+					if((*i)!="")
+					{
+						message.GetFields()[(*i)]="";
+					}
 				}
+
 			}
 		}
 		return true;

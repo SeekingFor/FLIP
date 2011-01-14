@@ -141,8 +141,8 @@ void SetupDefaultOptions(SQLite3DB::DB *db)
 	st.Reset();
 	upd.Bind(0,"Messages");
 	upd.Bind(1,order++);
-	upd.Bind(2);
-	upd.Bind(3,"0|0|1|1|2|2|3|3|4|4|5|5|6|6");
+	upd.Bind(2,"0|0|1|1|2|2|3|3|4|4|5|5|6|6");
+	upd.Bind(3,"The priority class for message inserts.");
 	upd.Bind(4,"select");
 	upd.Bind(5);
 	upd.Bind(6);

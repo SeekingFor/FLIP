@@ -206,9 +206,12 @@ void FreenetMessageInserter::StartChannelInsert(const int localidentityid, const
 
 		mess["URI"]="SSK@"+m_identitykeys[localidentityid].substr(4)+m_messagebase+"|"+now.Format("%Y-%m-%d")+"|Message-"+indexstr;
 		mess["Identifier"]=m_fcpuniqueidentifier+"|"+idstr+"|"+now.Format("%Y-%m-%d")+"|"+indexstr+"|"+mess["URI"];
+		mess["RealTimeFlag"]="true";
 		mess["UploadFrom"]="direct";
 		mess["PriorityClass"]=m_insertpriority;
+		mess["ExtraInsertsSingleBlock"]="0";
 		mess["DataLength"]=datalengthstr;
+		mess["Metadata.ContentType"]="";
 
 		m_fcp->Send(mess);
 		m_fcp->Send(std::vector<char>(data.begin(),data.end()));
@@ -264,9 +267,12 @@ void FreenetMessageInserter::StartPrivateInsert(const int localidentityid, const
 
 			mess["URI"]="SSK@"+m_identitykeys[localidentityid].substr(4)+m_messagebase+"|"+now.Format("%Y-%m-%d")+"|Message-"+indexstr;
 			mess["Identifier"]=m_fcpuniqueidentifier+"|"+idstr+"|"+now.Format("%Y-%m-%d")+"|"+indexstr+"|"+mess["URI"];
+			mess["RealTimeFlag"]="true";
 			mess["UploadFrom"]="direct";
 			mess["PriorityClass"]=m_insertpriority;
+			mess["ExtraInsertsSingleBlock"]="0";
 			mess["DataLength"]=datalengthstr;
+			mess["Metadata.ContentType"]="";
 
 			m_fcp->Send(mess);
 			m_fcp->Send(std::vector<char>(data.begin(),data.end()));
@@ -309,9 +315,12 @@ void FreenetMessageInserter::StartJoinChannelInsert(const int localidentityid, c
 
 		mess["URI"]="SSK@"+m_identitykeys[localidentityid].substr(4)+m_messagebase+"|"+now.Format("%Y-%m-%d")+"|Message-"+indexstr;
 		mess["Identifier"]=m_fcpuniqueidentifier+"|"+idstr+"|"+now.Format("%Y-%m-%d")+"|"+indexstr+"|"+mess["URI"];
+		mess["RealTimeFlag"]="true";
 		mess["UploadFrom"]="direct";
 		mess["PriorityClass"]=m_insertpriority;
+		mess["ExtraInsertsSingleBlock"]="0";
 		mess["DataLength"]=datalengthstr;
+		mess["Metadata.ContentType"]="";
 
 		m_fcp->Send(mess);
 		m_fcp->Send(std::vector<char>(data.begin(),data.end()));
@@ -352,9 +361,12 @@ void FreenetMessageInserter::StartPartChannelInsert(const int localidentityid, c
 
 		mess["URI"]="SSK@"+m_identitykeys[localidentityid].substr(4)+m_messagebase+"|"+now.Format("%Y-%m-%d")+"|Message-"+indexstr;
 		mess["Identifier"]=m_fcpuniqueidentifier+"|"+idstr+"|"+now.Format("%Y-%m-%d")+"|"+indexstr+"|"+mess["URI"];
+		mess["RealTimeFlag"]="true";
 		mess["UploadFrom"]="direct";
 		mess["PriorityClass"]=m_insertpriority;
+		mess["ExtraInsertsSingleBlock"]="0";
 		mess["DataLength"]=datalengthstr;
+		mess["Metadata.ContentType"]="";
 
 		m_fcp->Send(mess);
 		m_fcp->Send(std::vector<char>(data.begin(),data.end()));
@@ -394,9 +406,12 @@ void FreenetMessageInserter::StartKeepAliveInsert(const int localidentityid)
 
 		mess["URI"]="SSK@"+m_identitykeys[localidentityid].substr(4)+m_messagebase+"|"+now.Format("%Y-%m-%d")+"|Message-"+indexstr;
 		mess["Identifier"]=m_fcpuniqueidentifier+"|"+idstr+"|"+now.Format("%Y-%m-%d")+"|"+indexstr+"|"+mess["URI"];
+		mess["RealTimeFlag"]="true";
 		mess["UploadFrom"]="direct";
 		mess["PriorityClass"]=m_insertpriority;
+		mess["ExtraInsertsSingleBlock"]="0";
 		mess["DataLength"]=datalengthstr;
+		mess["Metadata.ContentType"]="";
 
 		m_fcp->Send(mess);
 		m_fcp->Send(std::vector<char>(data.begin(),data.end()));
