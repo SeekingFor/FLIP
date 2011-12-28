@@ -1,9 +1,12 @@
 /*
  *  Portable interface to the CPU cycle counter
  *
- *  Based on XySSL: Copyright (C) 2006-2008  Christophe Devine
+ *  Copyright (C) 2006-2010, Brainspark B.V.
  *
- *  Copyright (C) 2009  Paul Bakker <polarssl_maintainer at polarssl dot org>
+ *  This file is part of PolarSSL (http://www.polarssl.org)
+ *  Lead Maintainer: Paul Bakker <polarssl_maintainer at polarssl.org>
+ *
+ *  All rights reserved.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -26,7 +29,7 @@
 
 #include "polarssl/timing.h"
 
-#if defined(WIN32)
+#if defined(_WIN32)
 
 #include <windows.h>
 #include <winbase.h>
@@ -67,9 +70,9 @@ unsigned long hardclock( void )
 
 unsigned long hardclock( void )
 {
-    unsigned long tsc;
-    asm( "rdtsc" : "=a" (tsc) );
-    return( tsc );
+    unsigned long lo, hi;
+    asm( "rdtsc" : "=a" (lo), "=d" (hi) );
+    return( lo );
 }
 
 #else
@@ -134,6 +137,18 @@ unsigned long hardclock( void )
 }
 
 #else
+#if defined(_MSC_VER)
+
+unsigned long hardclock( void )
+{
+    LARGE_INTEGER offset;
+    
+	QueryPerformanceCounter( &offset );
+
+	return (unsigned long)( offset.QuadPart );
+}
+
+#else
 
 static int hardclock_init = 0;
 static struct timeval tv_init;
@@ -154,6 +169,7 @@ unsigned long hardclock( void )
 }
 
 #endif /* generic */
+#endif /* WIN32   */
 #endif /* IA-64   */
 #endif /* Alpha   */
 #endif /* SPARC8  */
@@ -161,9 +177,9 @@ unsigned long hardclock( void )
 #endif /* AMD64   */
 #endif /* i586+   */
 
-int alarmed = 0;
+volatile int alarmed = 0;
 
-#if defined(WIN32)
+#if defined(_WIN32)
 
 unsigned long get_timer( struct hr_time *val, int reset )
 {

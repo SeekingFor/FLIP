@@ -162,8 +162,7 @@ void FreenetIdentityRequester::Process()
 
 	if(m_ids.size()==0 && m_lastloadedids<oneminuteago)
 	{
-		SQLite3DB::Statement st=m_db->Prepare("SELECT IdentityID FROM tblIdentity WHERE Ignored=0;");// AND (LastSeen IS NULL OR LastSeen<?);");
-		st.Bind(0,now.Format("%Y-%m-%d"));
+		SQLite3DB::Statement st=m_db->Prepare("SELECT IdentityID FROM tblIdentity WHERE Ignored=0;");
 		st.Step();
 		while(st.RowReturned())
 		{

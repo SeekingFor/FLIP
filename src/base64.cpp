@@ -7,7 +7,7 @@ const bool Base64::Decode(const std::string &encoded, std::vector<unsigned char>
 	if(encoded.size()>0)
 	{
 		int rval=0;
-		int datalength=0;
+		size_t datalength=0;
 
 		rval=base64_decode(0,&datalength,(unsigned char *)encoded.c_str(),encoded.size());
 
@@ -40,7 +40,7 @@ const bool Base64::Encode(std::vector<unsigned char> &data, std::string &encoded
 	if(data.size()>0)
 	{
 		int rval=0;
-		int encodedlength=0;
+		size_t encodedlength=0;
 		std::vector<unsigned char> encodeddata;
 
 		rval=base64_encode(0,&encodedlength,&data[0],data.size());

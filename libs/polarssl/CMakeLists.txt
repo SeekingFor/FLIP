@@ -1,20 +1,26 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 2.4)
-IF(COMMAND CMAKE_POLICY)
-	CMAKE_POLICY(SET CMP0003 OLD)
-ENDIF(COMMAND CMAKE_POLICY)
+cmake_minimum_required(VERSION 2.6)
+project(POLARSSL C)
 
-PROJECT(polarssl)
+if(CMAKE_COMPILER_IS_GNUCC)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -W -Wdeclaration-after-statement")
+  set(CMAKE_C_FLAGS_DEBUG "-g -O0")
+  set(CMAKE_C_FLAGS_COVERAGE "-g -O0 -fprofile-arcs -ftest-coverage -lgcov")
+endif(CMAKE_COMPILER_IS_GNUCC)
+ 
+if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
+  if(CMAKE_COMPILER_IS_GNUCC)
+    set(CMAKE_SHARED_LINKER_FLAGS "-fprofile-arcs -ftest-coverage")
+  endif(CMAKE_COMPILER_IS_GNUCC)
+endif(CMAKE_BUILD_TYPE STREQUAL "Coverage")
 
-SET(POLARSSL_SRC
-library/base64.c
-library/bignum.c
-library/havege.c
-library/rsa.c
-library/sha1.c
-library/sha2.c
-library/sha4.c
-library/timing.c
-)
+option(USE_PKCS11_HELPER_LIBRARY "Build PolarSSL with the pkcs11-helper library." OFF)
 
-INCLUDE_DIRECTORIES(./include)
-ADD_LIBRARY(polarssl ${POLARSSL_SRC})
+if(LIB_INSTALL_DIR)
+else()
+set(LIB_INSTALL_DIR lib)
+endif()
+
+include_directories(include/)
+
+add_subdirectory(library)
+add_subdirectory(include)

@@ -1,9 +1,14 @@
 /**
  * \file timing.h
  *
- *  Based on XySSL: Copyright (C) 2006-2008  Christophe Devine
+ * \brief Portable interface to the CPU cycle counter
  *
- *  Copyright (C) 2009  Paul Bakker <polarssl_maintainer at polarssl dot org>
+ *  Copyright (C) 2006-2010, Brainspark B.V.
+ *
+ *  This file is part of PolarSSL (http://www.polarssl.org)
+ *  Lead Maintainer: Paul Bakker <polarssl_maintainer at polarssl.org>
+ *
+ *  All rights reserved.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -34,7 +39,7 @@ struct hr_time
 extern "C" {
 #endif
 
-extern int alarmed;
+extern volatile int alarmed;
 
 /**
  * \brief          Return the CPU cycle counter value
@@ -58,6 +63,8 @@ void set_alarm( int seconds );
 
 /**
  * \brief          Sleep for a certain amount of time
+ *
+ * \param milliseconds  delay in milliseconds
  */
 void m_sleep( int milliseconds );
 

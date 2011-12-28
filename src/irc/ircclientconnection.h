@@ -4,6 +4,10 @@
 #include <vector>
 #include <set>
 
+#include <polarssl/ssl.h>
+#include <polarssl/entropy.h>
+#include <polarssl/ctr_drbg.h>
+
 #include "irccommandhandler.h"
 #include "../ilogger.h"
 #include "../datetime.h"
@@ -11,7 +15,16 @@
 class IRCClientConnection:public ILogger
 {
 public:
-	IRCClientConnection(const int sock, IRCCommandHandler *commandhandler);
+
+	struct ssl_client_info
+	{
+		entropy_context m_entropy;
+		ctr_drbg_context m_ctr_drbg;
+		ssl_context m_ssl;
+		ssl_session m_session;
+	};
+
+	IRCClientConnection(const int sock, IRCCommandHandler *commandhandler, int connectiontype, ssl_client_info *ssl);
 
 	const bool IsConnected();
 	const bool Disconnect();
@@ -28,6 +41,12 @@ public:
 	{
 		REG_NICK=1,
 		REG_USER=2
+	};
+
+	enum con_type
+	{
+		CON_UNSECURE=1,
+		CON_SSL=2
 	};
 
 	int &Registered()							{ return m_registered; }
@@ -71,6 +90,8 @@ private:
 	std::string m_publickey;
 	std::string m_rsaprivatekey;
 	DateTime m_lastactivity;
+	int m_contype;					// type of connection - secure or SSL
+	ssl_client_info *m_ssl;
 };
 
 #endif	// _ircclientconnection_

@@ -31,7 +31,7 @@ const bool RSAKeyPair::Decrypt(const std::string &encrypted, std::string &messag
 		{
 			std::vector<unsigned char> input;
 			std::vector<unsigned char> output(mpi_size(&m_rsa.N),0);
-			int outputlength=output.size();
+			size_t outputlength=output.size();
 			Base64::Decode((*i),input);
 
 			if(input.size()==mpi_size(&m_rsa.N))
@@ -86,7 +86,7 @@ const bool RSAKeyPair::Encrypt(const std::string &message, std::string &encrypte
 		for(std::vector<std::string>::iterator i=messageblocks.begin(); i!=messageblocks.end(); i++)
 		{
 			std::vector<unsigned char> input((*i).begin(),(*i).end());
-			if(rsa_pkcs1_encrypt(&m_rsa,RSA_PUBLIC,input.size(),&input[0],&output[0])==0)
+			if(rsa_pkcs1_encrypt(&m_rsa,havege_random,&m_hs,RSA_PUBLIC,input.size(),&input[0],&output[0])==0)
 			{
 				std::string temp("");
 				Base64::Encode(output,temp);
@@ -126,7 +126,7 @@ const bool RSAKeyPair::Generate()
 {
 	InitializeContext();
 
-	int rval=rsa_gen_key(&m_rsa,1024,65537);
+	int rval=rsa_gen_key(&m_rsa,havege_random,&m_hs,1024,65537);
 
 	if(rval!=0)
 	{
@@ -209,7 +209,7 @@ void RSAKeyPair::InitializeContext()
 {
 	FreeContext();
 
-	rsa_init(&m_rsa,RSA_PKCS_V15,0,havege_rand,&m_hs);
+	rsa_init(&m_rsa,RSA_PKCS_V15,0);
 	m_initialized=true;
 }
 

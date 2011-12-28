@@ -5,8 +5,8 @@
 #include "db/sqlite3db.h"
 
 #define FLIP_MAJOR		"0"
-#define FLIP_MINOR		"0"
-#define FLIP_RELEASE	"7"
+#define FLIP_MINOR		"1"
+#define FLIP_RELEASE	"0"
 #define FLIP_VERSION	FLIP_MAJOR"."FLIP_MINOR"."FLIP_RELEASE
 
 namespace global

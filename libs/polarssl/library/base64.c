@@ -1,9 +1,12 @@
 /*
  *  RFC 1521 base64 encoding/decoding
  *
- *  Based on XySSL: Copyright (C) 2006-2008  Christophe Devine
+ *  Copyright (C) 2006-2010, Brainspark B.V.
  *
- *  Copyright (C) 2009  Paul Bakker <polarssl_maintainer at polarssl dot org>
+ *  This file is part of PolarSSL (http://www.polarssl.org)
+ *  Lead Maintainer: Paul Bakker <polarssl_maintainer at polarssl.org>
+ *
+ *  All rights reserved.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -57,10 +60,10 @@ static const unsigned char base64_dec_map[128] =
 /*
  * Encode a buffer into base64 format
  */
-int base64_encode( unsigned char *dst, int *dlen,
-                   unsigned char *src, int  slen )
+int base64_encode( unsigned char *dst, size_t *dlen,
+                   const unsigned char *src, size_t slen )
 {
-    int i, n;
+    size_t i, n;
     int C1, C2, C3;
     unsigned char *p;
 
@@ -120,10 +123,10 @@ int base64_encode( unsigned char *dst, int *dlen,
 /*
  * Decode a base64-formatted buffer
  */
-int base64_decode( unsigned char *dst, int *dlen,
-                   unsigned char *src, int  slen )
+int base64_decode( unsigned char *dst, size_t *dlen,
+                   const unsigned char *src, size_t slen )
 {
-    int i, j, n;
+    size_t i, j, n;
     unsigned long x;
     unsigned char *p;
 
@@ -207,7 +210,7 @@ static const unsigned char base64_test_enc[] =
  */
 int base64_self_test( int verbose )
 {
-    int len;
+    size_t len;
     unsigned char *src, buffer[128];
 
     if( verbose != 0 )

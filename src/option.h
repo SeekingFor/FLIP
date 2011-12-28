@@ -14,6 +14,7 @@ public:
 	const bool Get(const std::string &option, std::string &value);
 	const bool GetInt(const std::string &option, int &value);
 	const bool GetUnsignedShort(const std::string &option, unsigned short &value);
+	const bool GetBool(const std::string &option, bool &value);
 	template<class T>
 	void Set(const std::string &option, const T &value);
 private:

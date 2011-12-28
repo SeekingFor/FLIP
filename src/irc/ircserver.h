@@ -9,6 +9,8 @@
 #include "ircclientconnection.h"
 #include "irccommandhandler.h"
 
+#include <polarssl/ssl.h>
+
 #include <vector>
 #include <set>
 #include <map>
@@ -31,8 +33,12 @@ private:
 	void SendChannelMessageToClients(const int identityid, const std::string &channel, const std::string &message);
 	void SendPrivateMessageToClients(const int identityid, const std::string &recipient, const std::string &encryptedmessage);
 	void SendPartMessageToClients(const int identityid, const std::string &channel);
+	void SendMOTDLines(IRCClientConnection *client);
 
 	void ProcessFLIPEvent(const int identityid, const FLIPEvent &flipevent);
+	const bool SetupServerSSL();
+	void ShutdownServerSSL();
+	const bool SetupClientSSL(IRCClientConnection::ssl_client_info &ssl, int socket);
 
 	struct idinfo
 	{
@@ -63,12 +69,22 @@ private:
 
 	DateTime m_datestarted;
 	std::vector<int> m_listensockets;				// sockets we are listening on
+	std::vector<int> m_ssllistensockets;			// SSL sockets we are listening on
 	std::vector<IRCClientConnection *> m_clients;
 	std::string m_servername;
 
 	std::map<int,idinfo> m_ids;
 	std::map<std::string,std::set<int> > m_idchannels;	// channels each id is in
 	std::set<int> m_idhassent;							// contains id if that identity has already sent a message within the window - we will accept all messages after no matter when they were sent
+
+	std::vector<std::string> m_motdlines;
+	struct ssl_server_info
+	{
+		x509_cert m_cert;
+		rsa_context m_rsa;
+	};
+	ssl_server_info m_ssl;
+	bool m_sslsetup;
 
 	#ifdef _WIN32
 	static bool m_wsastartup;

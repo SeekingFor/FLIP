@@ -21,6 +21,27 @@ const bool Option::Get(const std::string &option, std::string &value)
 	}
 }
 
+const bool Option::GetBool(const std::string &option, bool &value)
+{
+	std::string valstr="";
+	if(Get(option,valstr))
+	{
+		if(valstr=="TRUE" || valstr=="true" || valstr=="1")
+		{
+			value=true;
+			return true;
+		}
+		else if(valstr=="FALSE" || valstr=="false" || valstr=="0")
+		{
+			value=false;
+			return true;
+		}
+	}
+
+	return false;
+
+}
+
 const bool Option::GetInt(const std::string &option, int &value)
 {
 	std::string valstr="";

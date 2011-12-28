@@ -1,9 +1,12 @@
 /*
  *  FIPS-180-2 compliant SHA-384/512 implementation
  *
- *  Based on XySSL: Copyright (C) 2006-2008  Christophe Devine
+ *  Copyright (C) 2006-2010, Brainspark B.V.
  *
- *  Copyright (C) 2009  Paul Bakker <polarssl_maintainer at polarssl dot org>
+ *  This file is part of PolarSSL (http://www.polarssl.org)
+ *  Lead Maintainer: Paul Bakker <polarssl_maintainer at polarssl.org>
+ *
+ *  All rights reserved.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -31,8 +34,9 @@
 
 #include "polarssl/sha4.h"
 
-#include <string.h>
+#if defined(POLARSSL_FS_IO) || defined(POLARSSL_SELF_TEST)
 #include <stdio.h>
+#endif
 
 /*
  * 64-bit integer manipulation macros (big endian)
@@ -40,14 +44,14 @@
 #ifndef GET_UINT64_BE
 #define GET_UINT64_BE(n,b,i)                            \
 {                                                       \
-    (n) = ( (unsigned int64) (b)[(i)    ] << 56 )       \
-        | ( (unsigned int64) (b)[(i) + 1] << 48 )       \
-        | ( (unsigned int64) (b)[(i) + 2] << 40 )       \
-        | ( (unsigned int64) (b)[(i) + 3] << 32 )       \
-        | ( (unsigned int64) (b)[(i) + 4] << 24 )       \
-        | ( (unsigned int64) (b)[(i) + 5] << 16 )       \
-        | ( (unsigned int64) (b)[(i) + 6] <<  8 )       \
-        | ( (unsigned int64) (b)[(i) + 7]       );      \
+    (n) = ( (unsigned long64) (b)[(i)    ] << 56 )       \
+        | ( (unsigned long64) (b)[(i) + 1] << 48 )       \
+        | ( (unsigned long64) (b)[(i) + 2] << 40 )       \
+        | ( (unsigned long64) (b)[(i) + 3] << 32 )       \
+        | ( (unsigned long64) (b)[(i) + 4] << 24 )       \
+        | ( (unsigned long64) (b)[(i) + 5] << 16 )       \
+        | ( (unsigned long64) (b)[(i) + 6] <<  8 )       \
+        | ( (unsigned long64) (b)[(i) + 7]       );      \
 }
 #endif
 
@@ -68,7 +72,7 @@
 /*
  * Round constants
  */
-static const unsigned int64 K[80] =
+static const unsigned long64 K[80] =
 {
     UL64(0x428A2F98D728AE22),  UL64(0x7137449123EF65CD),
     UL64(0xB5C0FBCFEC4D3B2F),  UL64(0xE9B5DBA58189DBBC),
@@ -148,11 +152,11 @@ void sha4_starts( sha4_context *ctx, int is384 )
     ctx->is384 = is384;
 }
 
-static void sha4_process( sha4_context *ctx, unsigned char data[128] )
+static void sha4_process( sha4_context *ctx, const unsigned char data[128] )
 {
     int i;
-    unsigned int64 temp1, temp2, W[80];
-    unsigned int64 A, B, C, D, E, F, G, H;
+    unsigned long64 temp1, temp2, W[80];
+    unsigned long64 A, B, C, D, E, F, G, H;
 
 #define  SHR(x,n) (x >> n)
 #define ROTR(x,n) (SHR(x,n) | (x << (64 - n)))
@@ -220,20 +224,20 @@ static void sha4_process( sha4_context *ctx, unsigned char data[128] )
 /*
  * SHA-512 process buffer
  */
-void sha4_update( sha4_context *ctx, unsigned char *input, int ilen )
+void sha4_update( sha4_context *ctx, const unsigned char *input, size_t ilen )
 {
-    int fill;
-    unsigned int64 left;
+    size_t fill;
+    unsigned int left;
 
     if( ilen <= 0 )
         return;
 
-    left = ctx->total[0] & 0x7F;
-    fill = (int)( 128 - left );
+    left = (unsigned int) (ctx->total[0] & 0x7F);
+    fill = 128 - left;
 
-    ctx->total[0] += ilen;
+    ctx->total[0] += (unsigned long64) ilen;
 
-    if( ctx->total[0] < (unsigned int64) ilen )
+    if( ctx->total[0] < (unsigned long64) ilen )
         ctx->total[1]++;
 
     if( left && ilen >= fill )
@@ -277,8 +281,8 @@ static const unsigned char sha4_padding[128] =
  */
 void sha4_finish( sha4_context *ctx, unsigned char output[64] )
 {
-    int last, padn;
-    unsigned int64 high, low;
+    size_t last, padn;
+    unsigned long64 high, low;
     unsigned char msglen[16];
 
     high = ( ctx->total[0] >> 61 )
@@ -288,7 +292,7 @@ void sha4_finish( sha4_context *ctx, unsigned char output[64] )
     PUT_UINT64_BE( high, msglen, 0 );
     PUT_UINT64_BE( low,  msglen, 8 );
 
-    last = (int)( ctx->total[0] & 0x7F );
+    last = (size_t)( ctx->total[0] & 0x7F );
     padn = ( last < 112 ) ? ( 112 - last ) : ( 240 - last );
 
     sha4_update( ctx, (unsigned char *) sha4_padding, padn );
@@ -311,7 +315,7 @@ void sha4_finish( sha4_context *ctx, unsigned char output[64] )
 /*
  * output = SHA-512( input buffer )
  */
-void sha4( unsigned char *input, int ilen,
+void sha4( const unsigned char *input, size_t ilen,
            unsigned char output[64], int is384 )
 {
     sha4_context ctx;
@@ -323,10 +327,11 @@ void sha4( unsigned char *input, int ilen,
     memset( &ctx, 0, sizeof( sha4_context ) );
 }
 
+#if defined(POLARSSL_FS_IO)
 /*
  * output = SHA-512( file contents )
  */
-int sha4_file( char *path, unsigned char output[64], int is384 )
+int sha4_file( const char *path, unsigned char output[64], int is384 )
 {
     FILE *f;
     size_t n;
@@ -334,12 +339,12 @@ int sha4_file( char *path, unsigned char output[64], int is384 )
     unsigned char buf[1024];
 
     if( ( f = fopen( path, "rb" ) ) == NULL )
-        return( 1 );
+        return( POLARSSL_ERR_SHA4_FILE_IO_ERROR );
 
     sha4_starts( &ctx, is384 );
 
     while( ( n = fread( buf, 1, sizeof( buf ), f ) ) > 0 )
-        sha4_update( &ctx, buf, (int) n );
+        sha4_update( &ctx, buf, n );
 
     sha4_finish( &ctx, output );
 
@@ -348,20 +353,21 @@ int sha4_file( char *path, unsigned char output[64], int is384 )
     if( ferror( f ) != 0 )
     {
         fclose( f );
-        return( 2 );
+        return( POLARSSL_ERR_SHA4_FILE_IO_ERROR );
     }
 
     fclose( f );
     return( 0 );
 }
+#endif /* POLARSSL_FS_IO */
 
 /*
  * SHA-512 HMAC context setup
  */
-void sha4_hmac_starts( sha4_context *ctx, unsigned char *key, int keylen,
+void sha4_hmac_starts( sha4_context *ctx, const unsigned char *key, size_t keylen,
                        int is384 )
 {
-    int i;
+    size_t i;
     unsigned char sum[64];
 
     if( keylen > 128 )
@@ -390,7 +396,7 @@ void sha4_hmac_starts( sha4_context *ctx, unsigned char *key, int keylen,
  * SHA-512 HMAC process buffer
  */
 void sha4_hmac_update( sha4_context  *ctx,
-                       unsigned char *input, int ilen )
+                       const unsigned char *input, size_t ilen )
 {
     sha4_update( ctx, input, ilen );
 }
@@ -416,10 +422,19 @@ void sha4_hmac_finish( sha4_context *ctx, unsigned char output[64] )
 }
 
 /*
+ * SHA-512 HMAC context reset
+ */
+void sha4_hmac_reset( sha4_context *ctx )
+{
+    sha4_starts( ctx, ctx->is384 );
+    sha4_update( ctx, ctx->ipad, 128 );
+}
+
+/*
  * output = HMAC-SHA-512( hmac key, input buffer )
  */
-void sha4_hmac( unsigned char *key, int keylen,
-                unsigned char *input, int ilen,
+void sha4_hmac( const unsigned char *key, size_t keylen,
+                const unsigned char *input, size_t ilen,
                 unsigned char output[64], int is384 )
 {
     sha4_context ctx;

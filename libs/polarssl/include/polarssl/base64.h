@@ -1,9 +1,14 @@
 /**
  * \file base64.h
  *
- *  Based on XySSL: Copyright (C) 2006-2008  Christophe Devine
+ * \brief RFC 1521 base64 encoding/decoding
  *
- *  Copyright (C) 2009  Paul Bakker <polarssl_maintainer at polarssl dot org>
+ *  Copyright (C) 2006-2010, Brainspark B.V.
+ *
+ *  This file is part of PolarSSL (http://www.polarssl.org)
+ *  Lead Maintainer: Paul Bakker <polarssl_maintainer at polarssl.org>
+ *
+ *  All rights reserved.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -22,8 +27,10 @@
 #ifndef POLARSSL_BASE64_H
 #define POLARSSL_BASE64_H
 
-#define POLARSSL_ERR_BASE64_BUFFER_TOO_SMALL               -0x0010
-#define POLARSSL_ERR_BASE64_INVALID_CHARACTER              -0x0012
+#include <string.h>
+
+#define POLARSSL_ERR_BASE64_BUFFER_TOO_SMALL               -0x002A  /**< Output buffer too small. */
+#define POLARSSL_ERR_BASE64_INVALID_CHARACTER              -0x002C  /**< Invalid character in input. */
 
 #ifdef __cplusplus
 extern "C" {
@@ -44,8 +51,8 @@ extern "C" {
  * \note           Call this function with *dlen = 0 to obtain the
  *                 required buffer size in *dlen
  */
-int base64_encode( unsigned char *dst, int *dlen,
-                   unsigned char *src, int  slen );
+int base64_encode( unsigned char *dst, size_t *dlen,
+                   const unsigned char *src, size_t slen );
 
 /**
  * \brief          Decode a base64-formatted buffer
@@ -63,8 +70,8 @@ int base64_encode( unsigned char *dst, int *dlen,
  * \note           Call this function with *dlen = 0 to obtain the
  *                 required buffer size in *dlen
  */
-int base64_decode( unsigned char *dst, int *dlen,
-                   unsigned char *src, int  slen );
+int base64_decode( unsigned char *dst, size_t *dlen,
+                   const unsigned char *src, size_t slen );
 
 /**
  * \brief          Checkup routine

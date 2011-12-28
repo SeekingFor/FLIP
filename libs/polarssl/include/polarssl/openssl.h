@@ -1,9 +1,14 @@
 /**
  * \file openssl.h
  *
- *  Based on XySSL: Copyright (C) 2006-2008  Christophe Devine
+ * \brief OpenSSL wrapper (definitions, inline functions).
  *
- *  Copyright (C) 2009  Paul Bakker <polarssl_maintainer at polarssl dot org>
+ *  Copyright (C) 2006-2010, Brainspark B.V.
+ *
+ *  This file is part of PolarSSL (http://www.polarssl.org)
+ *  Lead Maintainer: Paul Bakker <polarssl_maintainer at polarssl.org>
+ *
+ *  All rights reserved.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -25,10 +30,10 @@
 #ifndef POLARSSL_OPENSSL_H
 #define POLARSSL_OPENSSL_H
 
-#include "polarssl/aes.h"
-#include "polarssl/md5.h"
-#include "polarssl/rsa.h"
-#include "polarssl/sha1.h"
+#include "aes.h"
+#include "md5.h"
+#include "rsa.h"
+#include "sha1.h"
 
 #define AES_SIZE                16
 #define AES_BLOCK_SIZE          16
