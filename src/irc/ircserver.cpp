@@ -7,6 +7,7 @@
 #include "../rsakeypair.h"
 
 #include <cstring>	// memset
+#include <algorithm>
 
 //debug
 #include <iostream>
@@ -43,6 +44,7 @@ IRCServer::IRCServer():m_servername("flip")
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_PARTCHANNEL,this);
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_CONNECTED,this);
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_DISCONNECTED,this);
+	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_KEEPALIVE,this);
 	m_sslsetup=false;
 }
 
@@ -52,6 +54,25 @@ IRCServer::~IRCServer()
 	WSACleanup();
 #endif
 	ShutdownServerSSL();
+}
+
+const bool IRCServer::GetPeerDBID(IRCClientConnection *client)
+{
+	if(client && client->PublicKey()!="")
+	{
+		SQLite3DB::Statement st=m_db->Prepare("SELECT IdentityID FROM tblIdentity WHERE PublicKey=?;");
+		st.Bind(0,client->PublicKey());
+		st.Step();
+		if(st.RowReturned())
+		{
+			if(st.ResultNull(0)==false)
+			{
+				st.ResultInt(0,client->PeerDBID());
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnection *client)
@@ -73,32 +94,43 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 
 				if(IRCNick::IsValid(nick))
 				{
-					SQLite3DB::Statement st=m_db->Prepare("SELECT LocalIdentityID, PublicKey, RSAPrivateKey FROM tblLocalIdentity WHERE Name=?;");
-					st.Bind(0,nick);
-					st.Step();
-					if(st.RowReturned()==false)
+					if(NickInUse(client,nick)==false)
 					{
-						RSAKeyPair rsa;
-						rsa.Generate();
-						DateTime now;
-						st=m_db->Prepare("INSERT INTO tblLocalIdentity(Name,DateAdded,RSAPublicKey,RSAPrivateKey) VALUES(?,?,?,?);");
+						SQLite3DB::Statement st=m_db->Prepare("SELECT LocalIdentityID, tblLocalIdentity.PublicKey, RSAPrivateKey, tblIdentity.IdentityID FROM tblLocalIdentity LEFT JOIN tblIdentity ON tblLocalIdentity.PublicKey=tblIdentity.PublicKey WHERE tblLocalIdentity.Name=?;");
 						st.Bind(0,nick);
-						st.Bind(1,now.Format("%Y-%m-%d %H:%M:%S"));
-						st.Bind(2,rsa.GetEncodedPublicKey());
-						st.Bind(3,rsa.GetEncodedPrivateKey());
-						st.Step(true);
-						client->DBID()=st.GetLastInsertRowID();
-						client->RSAPrivateKey()=rsa.GetEncodedPrivateKey();
+						st.Step();
+						if(st.RowReturned()==false)
+						{
+							RSAKeyPair rsa;
+							rsa.Generate();
+							DateTime now;
+							st=m_db->Prepare("INSERT INTO tblLocalIdentity(Name,DateAdded,RSAPublicKey,RSAPrivateKey) VALUES(?,?,?,?);");
+							st.Bind(0,nick);
+							st.Bind(1,now.Format("%Y-%m-%d %H:%M:%S"));
+							st.Bind(2,rsa.GetEncodedPublicKey());
+							st.Bind(3,rsa.GetEncodedPrivateKey());
+							st.Step(true);
+							client->LocalDBID()=st.GetLastInsertRowID();
+							client->RSAPrivateKey()=rsa.GetEncodedPrivateKey();
+						}
+						else
+						{
+							st.ResultInt(0,client->LocalDBID());
+							st.ResultText(1,client->PublicKey());
+							st.ResultText(2,client->RSAPrivateKey());
+							if(st.ResultNull(3)==false)
+							{
+								st.ResultInt(3,client->PeerDBID());
+							}
+						}
+
+						client->Registered()=(client->Registered() | IRCClientConnection::REG_NICK);
+						client->Nick()=nick;
 					}
 					else
 					{
-						st.ResultInt(0,client->DBID());
-						st.ResultText(1,client->PublicKey());
-						st.ResultText(2,client->RSAPrivateKey());
+						client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::ERR_NICKNAMEINUSE,"*",":Nickname is already in use."));
 					}
-
-					client->Registered()=(client->Registered() | IRCClientConnection::REG_NICK);
-					client->Nick()=nick;				
 				}
 				else
 				{
@@ -135,6 +167,8 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_LUSERCHANNELS,client->Nick(),channelcountstr+" :channels formed"));
 				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_LUSERME,client->Nick(),":I have "+clientcountstr+" clients and 1 server"));
 				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_USERHOST,client->Nick(),":"+client->Nick()+"=-n="+client->User()+"@freenet"));
+				// reload MOTD and send to client
+				ReloadMOTD();
 				if(m_motdlines.size()>0)
 				{
 					SendMOTDLines(client);
@@ -142,7 +176,7 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 
 				std::map<std::string,std::string> params;
 				params["nick"]=client->Nick();
-				StringFunctions::Convert(client->DBID(),params["localidentityid"]);
+				StringFunctions::Convert(client->LocalDBID(),params["localidentityid"]);
 
 				client->LastActivity().SetNowUTC();
 				DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_IRC_USERREGISTER,params));
@@ -187,7 +221,7 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 
 					std::map<std::string,std::string> params;
 					params["nick"]=client->Nick();
-					StringFunctions::Convert(client->DBID(),params["localidentityid"]);
+					StringFunctions::Convert(client->LocalDBID(),params["localidentityid"]);
 					params["channel"]=chan.GetName();
 
 					client->LastActivity().SetNowUTC();
@@ -216,7 +250,7 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 
 						std::map<std::string,std::string> params;
 						params["nick"]=client->Nick();
-						StringFunctions::Convert(client->DBID(),params["localidentityid"]);
+						StringFunctions::Convert(client->LocalDBID(),params["localidentityid"]);
 						params["channel"]=(*i);
 
 						client->LastActivity().SetNowUTC();
@@ -251,7 +285,7 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 
 				std::map<std::string,std::string> params;
 				params["nick"]=client->Nick();
-				StringFunctions::Convert(client->DBID(),params["localidentityid"]);
+				StringFunctions::Convert(client->LocalDBID(),params["localidentityid"]);
 				params["message"]=message;
 				params["channel"]=chan.GetName();
 
@@ -261,6 +295,8 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 			// message to another user
 			else
 			{
+				bool sentlocal=false;
+				int recipientid=0;
 				std::string message("");
 				std::vector<std::string>::const_iterator i=(command.GetParameters().begin()+1);
 				if((*i).size()>0 && (*i)[0]==':')
@@ -275,7 +311,7 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 
 				std::map<std::string,std::string> params;
 				params["nick"]=client->Nick();
-				StringFunctions::Convert(client->DBID(),params["localidentityid"]);
+				StringFunctions::Convert(client->LocalDBID(),params["localidentityid"]);
 				params["message"]=message;
 
 				std::vector<std::string> nickparts;
@@ -283,10 +319,36 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 				if(nickparts.size()>1)
 				{
 					params["recipientidentityid"]=nickparts[nickparts.size()-1];
+					StringFunctions::Convert(params["recipientidentityid"],recipientid);
 				}
 
 				client->LastActivity().SetNowUTC();
-				DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_IRC_PRIVATEMESSAGE,params));
+
+				// see if client is connected locally to this server and send directly, otherwise insert message in Freenet
+				for(std::vector<IRCClientConnection *>::iterator i=m_clients.begin(); i!=m_clients.end(); i++)
+				{
+					if((*i)->PeerDBID()==recipientid)
+					{
+						if(client->PeerDBID()>0 || GetPeerDBID(client)==true)
+						{
+							std::string peerdbid("");
+							StringFunctions::Convert(client->PeerDBID(),peerdbid);
+							(*i)->SendCommand(IRCCommand(":"+client->Nick()+"_"+peerdbid+" PRIVMSG "+(*i)->Nick()+" :"+message));
+							sentlocal=true;
+						}
+					}
+				}
+				if(sentlocal==false)
+				{
+					if(m_ids.find(recipientid)!=m_ids.end())
+					{
+						DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_IRC_PRIVATEMESSAGE,params));
+					}
+					else
+					{
+						client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::ERR_NOSUCHNICK,client->Nick(),command.GetParameters()[0]+" :No such nick"));
+					}
+				}
 
 			}
 		}
@@ -324,6 +386,137 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 			}
 		}
 		client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_LISTEND,client->Nick(),":End of list"));
+	}
+	else if(command.GetCommand()=="NAMES")
+	{
+		std::vector<std::string> channels;
+		int channelcount=0;
+		IRCChannel chan;
+
+		if(command.GetParameters().size()==0)
+		{
+			for(std::map<std::string,std::set<int> >::const_iterator i=m_idchannels.begin(); i!=m_idchannels.end(); i++)
+			{
+				channels.push_back((*i).first);
+			}
+		}
+		else if(command.GetParameters().size()==1)
+		{
+			StringFunctions::Split(command.GetParameters()[0],",",channels);
+		}
+
+		for(std::vector<std::string>::const_iterator i=channels.begin(); i!=channels.end(); i++)
+		{
+			if(m_idchannels.find((*i))!=m_idchannels.end())
+			{
+				channelcount++;
+				chan.SetName((*i));
+				std::string joinednicks("");
+				int nickcount=0;
+				for(std::set<int>::const_iterator j=m_idchannels[(*i)].begin(); j!=m_idchannels[(*i)].end(); j++)
+				{
+					if(m_ids[(*j)].m_nick!="" && m_ids[(*j)].m_publickey!=client->PublicKey())
+					{
+						std::string idstr("");
+						StringFunctions::Convert((*j),idstr);
+						if(joinednicks!="")
+						{
+							joinednicks+=" ";
+						}
+						joinednicks+=m_ids[(*j)].m_nick+"_"+idstr;
+						nickcount++;
+					}
+					else if(m_ids[(*j)].m_publickey==client->PublicKey())
+					{
+						if(joinednicks!="")
+						{
+							joinednicks+=" ";
+						}
+						joinednicks+=client->Nick();
+						nickcount++;
+					}
+					if(nickcount==10)
+					{
+						nickcount=0;
+						joinednicks="";
+						client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_NAMREPLY,client->Nick()," = "+chan.GetName()+" :"+joinednicks));
+					}
+				}
+				if(nickcount>0)
+				{
+					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_NAMREPLY,client->Nick()," = "+chan.GetName()+" :"+joinednicks));
+				}
+			}
+		}
+
+		if(channelcount==0 || channelcount>1)
+		{
+			client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_ENDOFNAMES,client->Nick(),":End of names"));
+		}
+		else
+		{
+			client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_ENDOFNAMES,client->Nick()," "+chan.GetName()+" :End of names"));
+		}
+
+	}
+	else if(command.GetCommand()=="WHOIS")
+	{
+		if(command.GetParameters().size()==1)
+		{
+			std::string idlestr("");
+			std::vector<std::string> nickparts;
+			StringFunctions::Split(command.GetParameters()[0],"_",nickparts);
+			if(nickparts.size()>1)
+			{
+				int identityid=0;
+				StringFunctions::Convert(nickparts[nickparts.size()-1],identityid);
+
+				if(m_ids.find(identityid)!=m_ids.end())
+				{
+					int chancount=0;
+					std::string chanstring("");
+
+					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_WHOISUSER,client->Nick(),command.GetParameters()[0]+" ~"+command.GetParameters()[0]+" "+m_ids[identityid].m_publickey+" * :"+command.GetParameters()[0]));
+
+					// send joined channels
+					for(std::map<std::string,std::set<int> >::const_iterator i=m_idchannels.begin(); i!=m_idchannels.end(); i++)
+					{
+						if((*i).second.find(identityid)!=(*i).second.end())
+						{
+							if(chanstring!="")
+							{
+								chanstring+=" ";
+							}
+							chanstring+=(*i).first;
+						}
+						if(chancount==10)
+						{
+							client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_WHOISCHANNELS,client->Nick(),command.GetParameters()[0]+" :"+chanstring));
+							chancount=0;
+							chanstring="";
+						}
+					}
+					if(chancount>0)
+					{
+						client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_WHOISCHANNELS,client->Nick(),command.GetParameters()[0]+" :"+chanstring));
+					}
+
+					// send idle time
+					DateTime now;
+					now.SetNowUTC();
+					StringFunctions::Convert(DateTime::DifferenceS(now,m_ids[identityid].m_lastircactivity),idlestr);
+					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_WHOISIDLE,client->Nick(),command.GetParameters()[0]+" "+idlestr+" :seconds idle"));
+
+					// end whois
+					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_ENDOFWHOIS,client->Nick(),":End of /WHOIS list."));
+				}
+				else
+				{
+					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::ERR_NOSUCHNICK,client->Nick(),command.GetParameters()[0]+" :No such nick"));
+				}
+
+			}
+		}
 	}
 	else if(command.GetCommand()=="MOTD")
 	{
@@ -378,7 +571,7 @@ const bool IRCServer::HandleFLIPEvent(const FLIPEvent &flipevent)
 	{
 		for(std::vector<IRCClientConnection *>::iterator i=m_clients.begin(); i!=m_clients.end(); i++)
 		{
-			(*i)->SendCommand(IRCCommand("NOTICE "+(*i)->Nick()+" :Freenet connection established"));
+			(*i)->SendCommand(IRCCommand("NOTICE * :Freenet connection established"));
 		}
 		return true;
 	}
@@ -386,7 +579,7 @@ const bool IRCServer::HandleFLIPEvent(const FLIPEvent &flipevent)
 	{
 		for(std::vector<IRCClientConnection *>::iterator i=m_clients.begin(); i!=m_clients.end(); i++)
 		{
-			(*i)->SendCommand(IRCCommand("NOTICE "+(*i)->Nick()+" :Freenet connection dropped"));
+			(*i)->SendCommand(IRCCommand("NOTICE * :Freenet connection dropped"));
 		}
 		return true;
 	}
@@ -459,9 +652,46 @@ const bool IRCServer::HandleFLIPEvent(const FLIPEvent &flipevent)
 			m_ids[identityid].m_messagequeue.insert(idinfo::messagequeueitem(flipevent,thisedition,insertday,now));
 		}
 
+		// the identity is active, so send the active message
+		std::map<std::string,std::string> activeparams;
+		activeparams["identityid"]=params["identityid"];
+		DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_IDENTITYACTIVE,activeparams));
+
 		return true;
 	}
 
+}
+
+const bool IRCServer::NickInUse(IRCClientConnection *client, const std::string &nick) const
+{
+	for(std::vector<IRCClientConnection *>::const_iterator i=m_clients.begin(); i!=m_clients.end(); i++)
+	{
+		if((*i)!=client && (*i)->Nick()==nick)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void IRCServer::ReloadMOTD()
+{
+	std::string temp("");
+	Option option;
+	option.Get("IRCMOTD",temp);
+
+	m_motdlines.clear();
+	if(temp.size()>0)
+	{
+		// convert \r\n and \r to \n before splitting lines
+		temp=StringFunctions::Replace(temp,"\r\n","\n");
+		temp=StringFunctions::Replace(temp,"\r","\n");
+		StringFunctions::Split(temp,"\n",m_motdlines);
+	}
+	else
+	{
+		m_motdlines.clear();
+	}
 }
 
 void IRCServer::ProcessFLIPEvent(const int identityid, const FLIPEvent &flipevent)
@@ -480,15 +710,55 @@ void IRCServer::ProcessFLIPEvent(const int identityid, const FLIPEvent &flipeven
 		m_ids[identityid].m_lastdayedition[insertday]=edition;
 	}
 
-	if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_NEWCHANNELMESSAGE)
+	if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_KEEPALIVE)
+	{
+		// join and part channels as required
+		if(params.find("channels")!=params.end())
+		{
+			std::vector<std::string> channels;
+			StringFunctions::Split(params["channels"]," ",channels);
+
+			// part channels not in list
+			for(std::map<std::string,std::set<int> >::iterator i=m_idchannels.begin(); i!=m_idchannels.end(); i++)
+			{
+				if((*i).second.find(identityid)!=(*i).second.end() && std::find(channels.begin(),channels.end(),(*i).first)==channels.end())
+				{
+					SendPartMessageToClients(identityid,(*i).first);
+
+					(*i).second.erase(identityid);
+
+					m_ids[identityid].m_lastircactivity.SetNowUTC();
+				}
+			}
+
+			// join channels not already joined
+			for(std::vector<std::string>::const_iterator ci=channels.begin(); ci!=channels.end(); ci++)
+			{
+				if((*ci).size()>1 && (*ci)[0]=='#' && IRCChannel::ValidName((*ci))==true)
+				{
+					if(m_idchannels[(*ci)].find(identityid)==m_idchannels[(*ci)].end())
+					{
+						m_idchannels[(*ci)].insert(identityid);
+						
+						SendJoinMessageToClients(identityid,(*ci));
+
+						m_ids[identityid].m_lastircactivity.SetNowUTC();
+					}
+				}
+			}
+		}
+	}
+	else if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_NEWCHANNELMESSAGE)
 	{
 		SendChannelMessageToClients(identityid,params["channel"],params["message"]);
+		m_ids[identityid].m_lastircactivity.SetNowUTC();
 	}
 	else if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_NEWPRIVATEMESSAGE)
 	{
 		SendPrivateMessageToClients(identityid,params["recipient"],params["encryptedmessage"]);
+		m_ids[identityid].m_lastircactivity.SetNowUTC();
 	}
-	else if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_IDENTITYINACTIVE || flipevent.GetType()==FLIPEvent::EVENT_FREENET_PARTCHANNEL)
+	else if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_IDENTITYINACTIVE)
 	{
 		// send part command to connected clients
 		for(std::map<std::string,std::set<int> >::iterator i=m_idchannels.begin(); i!=m_idchannels.end(); i++)
@@ -500,6 +770,25 @@ void IRCServer::ProcessFLIPEvent(const int identityid, const FLIPEvent &flipeven
 				(*i).second.erase(identityid);
 			}
 		}
+		// remove the id from our cache, it is no longer active
+		m_ids.erase(identityid);
+	}
+	else if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_PARTCHANNEL)
+	{
+		// send part command to all connected clients in channel
+		for(std::map<std::string,std::set<int> >::iterator i=m_idchannels.begin(); i!=m_idchannels.end(); i++)
+		{
+			if((*i).second.find(identityid)!=(*i).second.end())
+			{
+				if((*i).first==params["channel"])
+				{
+					SendPartMessageToClients(identityid,(*i).first);
+
+					(*i).second.erase(identityid);
+				}
+			}
+		}
+		m_ids[identityid].m_lastircactivity.SetNowUTC();
 	}
 	else if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_JOINCHANNEL)
 	{
@@ -510,25 +799,9 @@ void IRCServer::ProcessFLIPEvent(const int identityid, const FLIPEvent &flipeven
 		{
 			m_idchannels[params["channel"]].insert(identityid);
 
-			for(std::vector<IRCClientConnection *>::iterator i=m_clients.begin(); i!=m_clients.end(); i++)
-			{
-				if((*i)->PublicKey()=="")
-				{
-					SQLite3DB::Statement st=m_db->Prepare("SELECT PublicKey FROM tblLocalIdentity WHERE LocalIdentityID=?;");
-					st.Bind(0,(*i)->DBID());
-					st.Step();
-					if(st.RowReturned())
-					{
-						st.ResultText(0,(*i)->PublicKey());
-					}
-				}
-				// don't send join message if the client is the one that sent the message
-				if((*i)->PublicKey()!=m_ids[identityid].m_publickey && (*i)->JoinedChannels().find(params["channel"])!=(*i)->JoinedChannels().end())
-				{
-					(*i)->SendCommand(IRCCommand(":"+m_ids[identityid].m_nick+"_"+idstr+" JOIN "+params["channel"]));
-				}
-			}
+			SendJoinMessageToClients(identityid,params["channel"]);
 		}
+		m_ids[identityid].m_lastircactivity.SetNowUTC();
 	}
 
 }
@@ -555,27 +828,8 @@ void IRCServer::SendChannelMessageToClients(const int identityid, const std::str
 	if(m_idchannels[channel].find(identityid)==m_idchannels[channel].end())
 	{
 		m_idchannels[channel].insert(identityid);
-		// send join command for this identity to connected clients
-		for(std::vector<IRCClientConnection *>::iterator i=m_clients.begin(); i!=m_clients.end(); i++)
-		{
-			if((*i)->PublicKey()=="")
-			{
-				SQLite3DB::Statement st=m_db->Prepare("SELECT PublicKey FROM tblLocalIdentity WHERE LocalIdentityID=?;");
-				st.Bind(0,(*i)->DBID());
-				st.Step();
-				if(st.RowReturned())
-				{
-					st.ResultText(0,(*i)->PublicKey());
-				}
-			}
 
-			// don't send join message if the client is the one that sent the message
-			if((*i)->PublicKey()!=m_ids[identityid].m_publickey && (*i)->JoinedChannels().find(channel)!=(*i)->JoinedChannels().end())
-			{
-				(*i)->SendCommand(IRCCommand(":"+m_ids[identityid].m_nick+"_"+idstr+" JOIN "+channel));
-			}
-
-		}
+		SendJoinMessageToClients(identityid,channel);
 	}
 
 	// send message to connected clients
@@ -584,7 +838,7 @@ void IRCServer::SendChannelMessageToClients(const int identityid, const std::str
 		if((*i)->PublicKey()=="")
 		{
 			SQLite3DB::Statement st=m_db->Prepare("SELECT PublicKey FROM tblLocalIdentity WHERE LocalIdentityID=?;");
-			st.Bind(0,(*i)->DBID());
+			st.Bind(0,(*i)->LocalDBID());
 			st.Step();
 			if(st.RowReturned())
 			{
@@ -632,7 +886,7 @@ void IRCServer::SendPrivateMessageToClients(const int identityid, const std::str
 		if((*i)->PublicKey()=="")
 		{
 			SQLite3DB::Statement st=m_db->Prepare("SELECT PublicKey FROM tblLocalIdentity WHERE LocalIdentityID=?;");
-			st.Bind(0,(*i)->DBID());
+			st.Bind(0,(*i)->LocalDBID());
 			st.Step();
 			if(st.RowReturned())
 			{
@@ -669,6 +923,31 @@ void IRCServer::SendPrivateMessageToClients(const int identityid, const std::str
 	m_log->Debug("IRCServer::SendPrivateMessageToClients handled private message");
 }
 
+void IRCServer::SendJoinMessageToClients(const int identityid, const std::string &channel)
+{
+	std::string idstr("");
+	StringFunctions::Convert(identityid,idstr);
+
+	for(std::vector<IRCClientConnection *>::iterator i=m_clients.begin(); i!=m_clients.end(); i++)
+	{
+		if((*i)->PublicKey()=="")
+		{
+			SQLite3DB::Statement st=m_db->Prepare("SELECT PublicKey FROM tblLocalIdentity WHERE LocalIdentityID=?;");
+			st.Bind(0,(*i)->LocalDBID());
+			st.Step();
+			if(st.RowReturned())
+			{
+				st.ResultText(0,(*i)->PublicKey());
+			}
+		}
+		// don't send join message if the client is the one that sent the message
+		if((*i)->PublicKey()!=m_ids[identityid].m_publickey && (*i)->JoinedChannels().find(channel)!=(*i)->JoinedChannels().end())
+		{
+			(*i)->SendCommand(IRCCommand(":"+m_ids[identityid].m_nick+"_"+idstr+" JOIN "+channel));
+		}
+	}
+}
+
 void IRCServer::SendPartMessageToClients(const int identityid, const std::string &channel)
 {
 	std::string idstr("");
@@ -679,7 +958,7 @@ void IRCServer::SendPartMessageToClients(const int identityid, const std::string
 		if((*i)->PublicKey()=="")
 		{
 			SQLite3DB::Statement st=m_db->Prepare("SELECT PublicKey FROM tblLocalIdentity WHERE LocalIdentityID=?;");
-			st.Bind(0,(*i)->DBID());
+			st.Bind(0,(*i)->LocalDBID());
 			st.Step();
 			if(st.RowReturned())
 			{
@@ -840,16 +1119,8 @@ void IRCServer::Start()
 	option.Get("IRCListenPort",listenport);
 	option.Get("IRCSSLListenPort",listenportssl);
 	option.Get("IRCBindAddresses",bindaddresses);
-	option.Get("IRCMOTD",temp);
 
-	if(temp.size()>0)
-	{
-		StringFunctions::Split(temp,"\n",m_motdlines);
-	}
-	else
-	{
-		m_motdlines.clear();
-	}
+	ReloadMOTD();
 
 	StringFunctions::Split(bindaddresses,",",listenaddresses);
 
@@ -1025,9 +1296,21 @@ void IRCServer::Update(const unsigned long ms)
 			past.Add(0,-15,0,0,0,0);
 			if((*i)->LastActivity()<past)
 			{
+				std::string chanstring("");
 				std::map<std::string,std::string> params;
-				StringFunctions::Convert((*i)->DBID(),params["localidentityid"]);
+				StringFunctions::Convert((*i)->LocalDBID(),params["localidentityid"]);
 				(*i)->LastActivity().SetNowUTC();
+				
+				for(std::set<std::string>::const_iterator j=(*i)->JoinedChannels().begin(); j!=(*i)->JoinedChannels().end(); j++)
+				{
+					if(chanstring!="")
+					{
+						chanstring+=" ";
+					}
+					chanstring+=(*j);
+				}
+				params["channels"]=chanstring;
+
 				DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_IRC_KEEPALIVE,params));
 			}
 			i++;
@@ -1036,7 +1319,7 @@ void IRCServer::Update(const unsigned long ms)
 		{
 			std::map<std::string,std::string> params;
 			params["nick"]=(*i)->Nick();
-			StringFunctions::Convert((*i)->DBID(),params["localidentityid"]);
+			StringFunctions::Convert((*i)->LocalDBID(),params["localidentityid"]);
 
 			DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_IRC_USERQUIT,params));
 

@@ -14,6 +14,7 @@
 
 IRCClientConnection::IRCClientConnection(const int sock, IRCCommandHandler *commandhandler, int connectiontype, ssl_client_info *ssl):m_socket(sock),m_contype(connectiontype),m_ssl(ssl)
 ,m_commandhandler(commandhandler),m_tempbuffer(4096,0),m_registered(0),m_nick(""),m_user(""),m_realname(""),m_host("freenet"),m_publickey(""),m_rsaprivatekey("")
+,m_localdbid(-1),m_peerdbid(-1)
 {
 	m_lastactivity.SetNowUTC();
 	//we need to set the ssl socket handlers here because of the local socket variable

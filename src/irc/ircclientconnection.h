@@ -62,8 +62,10 @@ public:
 	const std::string &RealName() const			{ return m_realname; }
 	const std::set<std::string> &JoinedChannels() const	{ return m_joinedchannels; }
 	std::set<std::string> &JoinedChannels()				{ return m_joinedchannels; }
-	int &DBID()									{ return m_dbid; }
-	const int DBID() const						{ return m_dbid; }
+	int &LocalDBID()							{ return m_localdbid; }
+	const int LocalDBID() const					{ return m_localdbid; }
+	int &PeerDBID()								{ return m_peerdbid; }
+	const int PeerDBID() const					{ return m_peerdbid; }
 	std::string &PublicKey()					{ return m_publickey; }
 	const std::string &PublicKey() const		{ return m_publickey; }
 	std::string &RSAPrivateKey()				{ return m_rsaprivatekey; }
@@ -81,7 +83,8 @@ private:
 	std::vector<char> m_sendbuffer;
 	std::set<std::string> m_joinedchannels;
 
-	int m_dbid;
+	int m_localdbid;
+	int m_peerdbid;
 	int m_registered;
 	std::string m_nick;
 	std::string m_user;

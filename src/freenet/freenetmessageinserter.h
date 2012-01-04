@@ -30,7 +30,7 @@ private:
 	void StartPrivateInsert(const int localidentityid, const int recipientidentityid, const std::string &message);
 	void StartJoinChannelInsert(const int localidentityid, const std::string &channel);
 	void StartPartChannelInsert(const int localidentityid, const std::string &channel);
-	void StartKeepAliveInsert(const int localidentityid);
+	void StartKeepAliveInsert(const int localidentityid, const std::string &channels);
 	void LoadLocalIdentityPrivateKey(const int localidentityid);
 	const int GetNextMessageIndex(const int localidentityid, const DateTime &date);
 

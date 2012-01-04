@@ -23,6 +23,7 @@ void FreenetIdentityInserter::FCPConnected()
 {
 	m_inserting=false;
 	m_lastactivity.SetNowUTC();
+	m_timeout=10;
 }
 
 void FreenetIdentityInserter::FCPDisconnected()
@@ -49,6 +50,7 @@ const bool FreenetIdentityInserter::HandleFCPMessage(FCPv2::Message &message)
 		{
 			m_activeids[id].m_lastinserted.SetNowUTC();
 			m_log->Debug("FreenetIdentityInserter::HandleFCPMessage PutSuccessful for "+message["Identifier"]);
+			m_timeout=10;
 			return true;
 		}
 		else if(message.GetName()=="PutFailed")
@@ -120,13 +122,19 @@ const bool FreenetIdentityInserter::HandleFLIPEvent(const FLIPEvent &flipevent)
 void FreenetIdentityInserter::Process()
 {
 	DateTime now;
-	DateTime tenminutespassed;
-	tenminutespassed.Add(0,-10);
-	if(m_activeids.size()>0 && (m_inserting==false || m_lastactivity<tenminutespassed))
+	DateTime timeoutpassed;
+	timeoutpassed.Add(0,-m_timeout);
+	if(m_activeids.size()>0 && (m_inserting==false || m_lastactivity<timeoutpassed))
 	{
-		if(m_lastactivity<tenminutespassed)
+		if(m_lastactivity<timeoutpassed)
 		{
-			m_log->Error("FreenetIdentityInserter::Process more than 10 minutes have passed without a response from the node");
+			std::string timeoutstr("");
+			StringFunctions::Convert(m_timeout,timeoutstr);
+			m_log->Error("FreenetIdentityInserter::Process more than "+timeoutstr+" minutes have passed without a response from the node");
+			if(m_timeout<60)
+			{
+				m_timeout+=10;
+			}
 		}
 
 		int id=(*m_activeids.begin()).first;
@@ -140,8 +148,8 @@ void FreenetIdentityInserter::Process()
 			}
 		}
 
-		// only insert id every 10 minutes, or if date has changed
-		if(lastdate<tenminutespassed || lastdate.Day()!=now.Day())
+		// only insert id every x minutes, or if date has changed
+		if(lastdate<timeoutpassed || lastdate.Day()!=now.Day())
 		{
 			StartIDInsert(id);
 		}

@@ -32,6 +32,7 @@ public:
 private:
 	void SendChannelMessageToClients(const int identityid, const std::string &channel, const std::string &message);
 	void SendPrivateMessageToClients(const int identityid, const std::string &recipient, const std::string &encryptedmessage);
+	void SendJoinMessageToClients(const int identityid, const std::string &channel);
 	void SendPartMessageToClients(const int identityid, const std::string &channel);
 	void SendMOTDLines(IRCClientConnection *client);
 
@@ -39,6 +40,10 @@ private:
 	const bool SetupServerSSL();
 	void ShutdownServerSSL();
 	const bool SetupClientSSL(IRCClientConnection::ssl_client_info &ssl, int socket);
+	void ReloadMOTD();
+	const bool NickInUse(IRCClientConnection *client, const std::string &nick) const;
+
+	const bool GetPeerDBID(IRCClientConnection *client);
 
 	struct idinfo
 	{
@@ -65,6 +70,7 @@ private:
 		std::string m_publickey;
 		std::map<DateTime,int> m_lastdayedition;	// map of day, and edition # that we already processed from the identity - messages more than +1 after the last edition will be queued
 		std::set<messagequeueitem,messagequeuecompare> m_messagequeue;
+		DateTime m_lastircactivity;
 	};
 
 	DateTime m_datestarted;

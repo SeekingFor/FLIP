@@ -96,7 +96,16 @@ const bool FreenetMessageDownloader::HandleFCPMessage(FCPv2::Message &message)
 						}
 						else if(fm["type"]=="keepalive")
 						{
-							// we don't need to do anything for a keepalive message
+							params["identityid"]=idparts[1];
+							params["sentdate"]=fm["sentdate"];
+							params["insertday"]=idparts[2];
+							params["edition"]=idparts[3];
+							if(fm.Headers().find("channels")!=fm.Headers().end())
+							{
+								params["channels"]=fm["channels"];
+							}
+
+							DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_FREENET_KEEPALIVE,params));
 						}
 						else
 						{
@@ -236,7 +245,7 @@ void FreenetMessageDownloader::StartRequest(const int identityid, const std::str
 	mess["Identifier"]=m_fcpuniqueidentifier+"|"+identityidstr+"|"+date+"|"+editionstr+"|"+mess["URI"];
 	mess["RealTimeFlag"]="true";
 	mess["ReturnType"]="direct";
-	mess["MaxSize"]="1024";
+	mess["MaxSize"]="32768";
 
 	m_fcp->Send(mess);
 

@@ -17,6 +17,9 @@ public:
 
 	void Add(const int seconds, const int minutes=0, const int hours=0, const int days=0, const int months=0, const int years=0);
 
+	static const int DifferenceS(DateTime &endtime, DateTime &starttime);
+	const time_t TimeT();
+
 	void StripTime()			{ Set(Year(),Month(),Day(),0,0,0); }
 
 	const int Year() const		{ return m_tm.tm_year+1900; }

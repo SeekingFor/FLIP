@@ -24,6 +24,7 @@ DateTime::DateTime(const int year, const int month, const int day, const int hou
 
 void DateTime::Add(const int seconds, const int minutes, const int hours, const int days, const int months, const int years)
 {
+	time_t temp;
 	m_tm.tm_sec+=seconds;
 	m_tm.tm_min+=minutes;
 	m_tm.tm_hour+=hours;
@@ -32,11 +33,11 @@ void DateTime::Add(const int seconds, const int minutes, const int hours, const 
 	m_tm.tm_year+=years;
 	m_tm.tm_isdst=0;
 #ifdef _WIN32
-	_mkgmtime(&m_tm);
+	temp=_mkgmtime(&m_tm);
 #else
-	time_t temp;
 	librock_mkgmtime((const librock_STRUCT_TM_s *)&m_tm,(librock_TIME_T_s *)&temp);
 #endif
+	m_tm=*(gmtime(&temp));
 }
 
 const bool DateTime::Convert(const std::string &input, int &output)
@@ -50,6 +51,14 @@ const bool DateTime::Convert(const std::string &input, int &output)
 	{
 		return false;
 	}
+}
+
+const int DateTime::DifferenceS(DateTime &endtime, DateTime &starttime)
+{
+	time_t endt=endtime.TimeT();
+	time_t startt=starttime.TimeT();
+
+	return difftime(endt,startt);
 }
 
 const std::string DateTime::Format(const std::string &format) const
@@ -74,6 +83,7 @@ void DateTime::Set(const time_t timet)
 
 void DateTime::Set(const int year, const int month, const int day, const int hour, const int minute, const int second)
 {
+	time_t temp;
 	m_tm.tm_year=year-1900;
 	m_tm.tm_mon=month-1;
 	m_tm.tm_mday=day;
@@ -82,11 +92,11 @@ void DateTime::Set(const int year, const int month, const int day, const int hou
 	m_tm.tm_sec=second;
 	m_tm.tm_isdst=0;
 #ifdef _WIN32
-	_mkgmtime(&m_tm);
+	temp=_mkgmtime(&m_tm);
 #else
-	time_t temp;
 	librock_mkgmtime((const librock_STRUCT_TM_s *)&m_tm,(librock_TIME_T_s *)&temp);
 #endif
+	m_tm=*(gmtime(&temp));
 }
 
 void DateTime::SetNowUTC()
@@ -94,6 +104,19 @@ void DateTime::SetNowUTC()
 	time_t timet;
 	time(&timet);
 	m_tm=*gmtime(&timet);
+}
+
+const time_t DateTime::TimeT()
+{
+	time_t result;
+
+#ifdef _WIN32
+	result=_mkgmtime(&m_tm);
+#else
+	librock_mkgmtime((const librock_STRUCT_TM_s *)&m_tm,(librock_TIME_T_s *)&result);
+#endif
+
+	return result;
 }
 
 const bool DateTime::operator==(const DateTime &rhs) const

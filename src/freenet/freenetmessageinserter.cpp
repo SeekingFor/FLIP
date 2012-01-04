@@ -146,7 +146,7 @@ const bool FreenetMessageInserter::HandleFLIPEvent(const FLIPEvent &flipevent)
 
 		StringFunctions::Convert(params["localidentityid"],localidentityid);
 
-		StartKeepAliveInsert(localidentityid);
+		StartKeepAliveInsert(localidentityid,params["channels"]);
 
 		return true;
 	}
@@ -375,7 +375,7 @@ void FreenetMessageInserter::StartPartChannelInsert(const int localidentityid, c
 	}
 }
 
-void FreenetMessageInserter::StartKeepAliveInsert(const int localidentityid)
+void FreenetMessageInserter::StartKeepAliveInsert(const int localidentityid, const std::string &channels)
 {
 	SQLite3DB::Statement st;
 	FCPv2::Message mess("ClientPut");
@@ -392,6 +392,7 @@ void FreenetMessageInserter::StartKeepAliveInsert(const int localidentityid)
 
 		fm["type"]="keepalive";
 		fm["sentdate"]=now.Format("%Y-%m-%d %H:%M:%S");
+		fm["channels"]=channels;
 		data=fm.GetMessageText();
 
 		StringFunctions::Convert(localidentityid,idstr);

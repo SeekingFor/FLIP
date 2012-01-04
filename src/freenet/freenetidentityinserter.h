@@ -41,6 +41,7 @@ private:
 	std::map<int,idinfo> m_activeids;
 	bool m_inserting;
 	DateTime m_lastactivity;
+	int m_timeout;
 
 };
 

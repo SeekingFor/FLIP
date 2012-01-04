@@ -8,6 +8,7 @@ FreenetMessageFinder::FreenetMessageFinder(FreenetConnection *connection, FCPv2:
 {
 
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_IDENTITYFOUND,this);
+	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_IDENTITYACTIVE,this);
 
 	Option option;
 	option.Get("MessageBase",m_messagebase);
@@ -121,7 +122,20 @@ const bool FreenetMessageFinder::HandleFLIPEvent(const FLIPEvent &flipevent)
 		{
 			m_log->Debug("FreenetMessageFinder::HandleFLIPEvent bad parameters");
 		}
+		return true;
 	}
+	else if(flipevent.GetType()==FLIPEvent::EVENT_IDENTITYACTIVE)
+	{
+		std::map<std::string,std::string> params=flipevent.GetParameters();
+		int id=0;
+
+		StringFunctions::Convert(params["identityid"],id);
+
+		m_ids[id].m_lastactive.SetNowUTC();
+
+		return true;
+	}
+
 	return false;
 }
 
