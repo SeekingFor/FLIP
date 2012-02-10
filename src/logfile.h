@@ -2,6 +2,7 @@
 #define _logfile_
 
 #include <string>
+#include <dlib/threads.h>
 
 class LogFile
 {
@@ -38,9 +39,7 @@ public:
 	const bool GetWriteNewLine() { return m_writenewline; }
 	void SetWriteNewLine(const bool writenewline) { m_writenewline=writenewline; }
 	
-	//void WriteLog(const char *format, ...);
 	void WriteLog(const std::string &text);
-	//void WriteLog(const LogLevel level, const char *format, ...);
 	void WriteLog(const LogLevel level, const std::string &text);
 
 	void Fatal(const std::string &text)		{ WriteLog(LOGLEVEL_FATAL,text); }
@@ -63,6 +62,7 @@ private:
 	bool m_writeloglevel;
 	bool m_writenewline;
 	char *m_datebuffer;
+	dlib::rmutex m_mutex;
 	
 };
 

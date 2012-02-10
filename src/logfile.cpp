@@ -37,6 +37,7 @@ LogFile::~LogFile()
 
 bool LogFile::CloseFile()
 {
+	dlib::auto_mutex guard(m_mutex);
 	if(m_fileptr)
 	{
 		fclose(m_fileptr);
@@ -48,6 +49,7 @@ bool LogFile::CloseFile()
 
 bool LogFile::OpenFile()
 {
+	dlib::auto_mutex guard(m_mutex);
 	CloseFile();
 
 	m_fileptr=fopen(m_filename.c_str(),"a+b");
@@ -75,37 +77,10 @@ void LogFile::WriteDate()
 		fputs(m_datebuffer,m_fileptr);
 	}
 }
-/*
-void LogFile::WriteLog(const char *format, ...)
-{
-	va_list va;
-	va_start(va,format);
-	
-	if(!m_fileptr)
-	{
-		OpenFile();
-	}
-	
-	if(m_fileptr)
-	{
-		if(m_writedate)
-		{
-			WriteDate();
-		}
-		vfprintf(m_fileptr,format,va);
-		if(m_writenewline==true)
-		{
-			fputs("\r\n",m_fileptr);
-		}
-		fflush(m_fileptr);
-	}
-	
-	va_end(va);
 
-}
-*/
 void LogFile::WriteLog(const std::string &text)
 {
+	dlib::auto_mutex guard(m_mutex);
 	if(!m_fileptr)
 	{
 		OpenFile();	
@@ -125,44 +100,10 @@ void LogFile::WriteLog(const std::string &text)
 		fflush(m_fileptr);
 	}
 }
-/*
-void LogFile::WriteLog(const LogLevel level, const char *format, ...)
-{
-	if(level<=m_loglevel)
-	{
-		
-		va_list va;
-		va_start(va,format);
-		
-		if(!m_fileptr)
-		{
-			OpenFile();	
-		}
-		
-		if(m_fileptr)
-		{
-			if(m_writedate)
-			{
-				WriteDate();	
-			}
-			if(m_writeloglevel)
-			{
-				WriteLogLevel(level);	
-			}
-			vfprintf(m_fileptr,format,va);
-			if(m_writenewline==true)
-			{
-				fputs("\r\n",m_fileptr);
-			}
-			fflush(m_fileptr);
-		}
-		
-		va_end(va);
-	}
-}
-*/
+
 void LogFile::WriteLog(const LogLevel level, const std::string &text)
 {
+	dlib::auto_mutex guard(m_mutex);
 	if(level<=m_loglevel)
 	{
 		if(!m_fileptr)
@@ -223,6 +164,7 @@ void LogFile::WriteLogLevel(LogLevel level)
 
 void LogFile::WriteNewLine()
 {
+	dlib::auto_mutex guard(m_mutex);
 	if(m_fileptr)
 	{
 		fputs("\r\n",m_fileptr);

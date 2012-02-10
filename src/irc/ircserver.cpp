@@ -75,9 +75,30 @@ const bool IRCServer::GetPeerDBID(IRCClientConnection *client)
 	return false;
 }
 
+void IRCServer::GetPublicKey(IRCClientConnection *client)
+{
+	if(client->PublicKey()=="")
+	{
+		SQLite3DB::Statement st=m_db->Prepare("SELECT PublicKey FROM tblLocalIdentity WHERE LocalIdentityID=?;");
+		st.Bind(0,client->LocalDBID());
+		st.Step();
+		if(st.RowReturned())
+		{
+			st.ResultText(0,client->PublicKey());
+		}
+		if(client->PublicKey()!="" && m_ids.find(client->PeerDBID())!=m_ids.end())
+		{
+			m_ids[client->PeerDBID()].m_publickey=client->PublicKey();
+			m_ids[client->PeerDBID()].m_nick=client->Nick();
+		}
+	}
+}
+
 const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnection *client)
 {
 	std::cout << "received " << command.GetCommandString() << std::endl;
+
+	GetPublicKey(client);
 
 	if(command.GetCommand()=="NICK")
 	{
@@ -112,6 +133,14 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 							st.Step(true);
 							client->LocalDBID()=st.GetLastInsertRowID();
 							client->RSAPrivateKey()=rsa.GetEncodedPrivateKey();
+
+							st=m_db->Prepare("INSERT INTO tblIdentity(Name,RSAPublicKey,DateAdded,AddedMethod) VALUES(?,?,?,?);");
+							st.Bind(0,nick);
+							st.Bind(1,rsa.GetEncodedPublicKey());
+							st.Bind(2,now.Format("%Y-%m-%d %H:%M:%S"));
+							st.Bind(3,"Local identity");
+							st.Step(true);
+							client->PeerDBID()=st.GetLastInsertRowID();
 						}
 						else
 						{
@@ -122,6 +151,13 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 							{
 								st.ResultInt(3,client->PeerDBID());
 							}
+						}
+
+						if(client->PeerDBID()>0)
+						{
+							m_ids[client->PeerDBID()].m_lastircactivity.SetNowUTC();
+							m_ids[client->PeerDBID()].m_nick=nick;
+							m_ids[client->PeerDBID()].m_publickey=client->PublicKey();
 						}
 
 						client->Registered()=(client->Registered() | IRCClientConnection::REG_NICK);
@@ -218,6 +254,11 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_ENDOFNAMES,client->Nick()," "+chan.GetName()+" :End of names"));
 
 					client->JoinedChannels().insert(chan.GetName());
+					if(client->PeerDBID()>0)
+					{
+						SendJoinMessageToClients(client->PeerDBID(),chan.GetName());
+						m_idchannels[chan.GetName()].insert(client->PeerDBID());
+					}
 
 					std::map<std::string,std::string> params;
 					params["nick"]=client->Nick();
@@ -247,6 +288,11 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 						client->SendCommand(IRCCommand(":"+client->Nick()+"!n="+client->User()+"@freenet PART :"+(*i)));
 
 						client->JoinedChannels().erase((*i));
+						if(client->PeerDBID()>0)
+						{
+							SendPartMessageToClients(client->PeerDBID(),(*i));
+							m_idchannels[(*i)].erase(client->PeerDBID());
+						}
 
 						std::map<std::string,std::string> params;
 						params["nick"]=client->Nick();
@@ -463,58 +509,97 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 	{
 		if(command.GetParameters().size()==1)
 		{
+			int identityid=0;
 			std::string idlestr("");
+			std::string nicknoid(command.GetParameters()[0]);
+			std::string::size_type pos=nicknoid.find_last_of("_");
+			if(pos!=std::string::npos)
+			{
+				nicknoid.erase(pos);
+			}
 			std::vector<std::string> nickparts;
 			StringFunctions::Split(command.GetParameters()[0],"_",nickparts);
+
 			if(nickparts.size()>1)
 			{
-				int identityid=0;
 				StringFunctions::Convert(nickparts[nickparts.size()-1],identityid);
+			}
 
-				if(m_ids.find(identityid)!=m_ids.end())
+			if(m_ids.find(identityid)!=m_ids.end() && m_ids[identityid].m_nick==nicknoid)
+			{
+				int chancount=0;
+				std::string chanstring("");
+
+				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_WHOISUSER,client->Nick(),command.GetParameters()[0]+" ~"+command.GetParameters()[0]+" "+m_ids[identityid].m_publickey+" * :"+command.GetParameters()[0]));
+
+				// send joined channels
+				for(std::map<std::string,std::set<int> >::const_iterator i=m_idchannels.begin(); i!=m_idchannels.end(); i++)
 				{
-					int chancount=0;
-					std::string chanstring("");
-
-					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_WHOISUSER,client->Nick(),command.GetParameters()[0]+" ~"+command.GetParameters()[0]+" "+m_ids[identityid].m_publickey+" * :"+command.GetParameters()[0]));
-
-					// send joined channels
-					for(std::map<std::string,std::set<int> >::const_iterator i=m_idchannels.begin(); i!=m_idchannels.end(); i++)
+					if((*i).second.find(identityid)!=(*i).second.end())
 					{
-						if((*i).second.find(identityid)!=(*i).second.end())
+						chancount+=1;
+						if(chanstring!="")
 						{
-							if(chanstring!="")
-							{
-								chanstring+=" ";
-							}
-							chanstring+=(*i).first;
+							chanstring+=" ";
 						}
-						if(chancount==10)
-						{
-							client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_WHOISCHANNELS,client->Nick(),command.GetParameters()[0]+" :"+chanstring));
-							chancount=0;
-							chanstring="";
-						}
+						chanstring+=(*i).first;
 					}
-					if(chancount>0)
+					if(chancount==10)
 					{
 						client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_WHOISCHANNELS,client->Nick(),command.GetParameters()[0]+" :"+chanstring));
+						chancount=0;
+						chanstring="";
 					}
-
-					// send idle time
-					DateTime now;
-					now.SetNowUTC();
-					StringFunctions::Convert(DateTime::DifferenceS(now,m_ids[identityid].m_lastircactivity),idlestr);
-					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_WHOISIDLE,client->Nick(),command.GetParameters()[0]+" "+idlestr+" :seconds idle"));
-
-					// end whois
-					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_ENDOFWHOIS,client->Nick(),":End of /WHOIS list."));
 				}
-				else
+				if(chancount>0)
 				{
-					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::ERR_NOSUCHNICK,client->Nick(),command.GetParameters()[0]+" :No such nick"));
+					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_WHOISCHANNELS,client->Nick(),command.GetParameters()[0]+" :"+chanstring));
 				}
 
+				// send idle time
+				DateTime now;
+				now.SetNowUTC();
+				StringFunctions::Convert(DateTime::DifferenceS(now,m_ids[identityid].m_lastircactivity),idlestr);
+				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_WHOISIDLE,client->Nick(),command.GetParameters()[0]+" "+idlestr+" :seconds idle"));
+
+				// end whois
+				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_ENDOFWHOIS,client->Nick(),":End of /WHOIS list."));
+			}
+			// client's own identity
+			else if(command.GetParameters()[0]==client->Nick())
+			{
+				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_WHOISUSER,client->Nick(),client->Nick()+" ~"+client->Nick()+" "+m_ids[identityid].m_publickey+" * :"+client->Nick()));
+
+				int chancount=0;
+				std::string chanstring("");
+				for(std::set<std::string>::const_iterator i=client->JoinedChannels().begin(); i!=client->JoinedChannels().end(); i++)
+				{
+					chancount+=1;
+					if(chanstring!="")
+					{
+						chanstring+=" ";
+					}
+					chanstring+=(*i);
+					if(chancount==10)
+					{
+						client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_WHOISCHANNELS,client->Nick(),client->Nick()+" :"+chanstring));
+						chancount=0;
+						chanstring="";
+					}
+				}
+				if(chancount>0)
+				{
+					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_WHOISCHANNELS,client->Nick(),client->Nick()+" :"+chanstring));
+				}
+
+				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_WHOISIDLE,client->Nick(),client->Nick()+" 0 :seconds idle"));
+
+				// end whois
+				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_ENDOFWHOIS,client->Nick(),":End of /WHOIS list."));
+			}
+			else
+			{
+				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::ERR_NOSUCHNICK,client->Nick(),command.GetParameters()[0]+" :No such nick"));
 			}
 		}
 	}
@@ -835,16 +920,7 @@ void IRCServer::SendChannelMessageToClients(const int identityid, const std::str
 	// send message to connected clients
 	for(std::vector<IRCClientConnection *>::iterator i=m_clients.begin(); i!=m_clients.end(); i++)
 	{
-		if((*i)->PublicKey()=="")
-		{
-			SQLite3DB::Statement st=m_db->Prepare("SELECT PublicKey FROM tblLocalIdentity WHERE LocalIdentityID=?;");
-			st.Bind(0,(*i)->LocalDBID());
-			st.Step();
-			if(st.RowReturned())
-			{
-				st.ResultText(0,(*i)->PublicKey());
-			}
-		}
+		GetPublicKey((*i));
 
 		// don't resend the message to the client that sent it in the first place
 		if((*i)->PublicKey()!=m_ids[identityid].m_publickey && (*i)->JoinedChannels().find(channel)!=(*i)->JoinedChannels().end())
@@ -883,16 +959,7 @@ void IRCServer::SendPrivateMessageToClients(const int identityid, const std::str
 	// send message to recipient of private message
 	for(std::vector<IRCClientConnection *>::iterator i=m_clients.begin(); i!=m_clients.end(); i++)
 	{
-		if((*i)->PublicKey()=="")
-		{
-			SQLite3DB::Statement st=m_db->Prepare("SELECT PublicKey FROM tblLocalIdentity WHERE LocalIdentityID=?;");
-			st.Bind(0,(*i)->LocalDBID());
-			st.Step();
-			if(st.RowReturned())
-			{
-				st.ResultText(0,(*i)->PublicKey());
-			}
-		}
+		GetPublicKey((*i));
 
 		if((*i)->PublicKey()==recipient)
 		{
@@ -930,16 +997,8 @@ void IRCServer::SendJoinMessageToClients(const int identityid, const std::string
 
 	for(std::vector<IRCClientConnection *>::iterator i=m_clients.begin(); i!=m_clients.end(); i++)
 	{
-		if((*i)->PublicKey()=="")
-		{
-			SQLite3DB::Statement st=m_db->Prepare("SELECT PublicKey FROM tblLocalIdentity WHERE LocalIdentityID=?;");
-			st.Bind(0,(*i)->LocalDBID());
-			st.Step();
-			if(st.RowReturned())
-			{
-				st.ResultText(0,(*i)->PublicKey());
-			}
-		}
+		GetPublicKey((*i));
+
 		// don't send join message if the client is the one that sent the message
 		if((*i)->PublicKey()!=m_ids[identityid].m_publickey && (*i)->JoinedChannels().find(channel)!=(*i)->JoinedChannels().end())
 		{
@@ -955,16 +1014,7 @@ void IRCServer::SendPartMessageToClients(const int identityid, const std::string
 
 	for(std::vector<IRCClientConnection *>::iterator i=m_clients.begin(); i!=m_clients.end(); i++)
 	{
-		if((*i)->PublicKey()=="")
-		{
-			SQLite3DB::Statement st=m_db->Prepare("SELECT PublicKey FROM tblLocalIdentity WHERE LocalIdentityID=?;");
-			st.Bind(0,(*i)->LocalDBID());
-			st.Step();
-			if(st.RowReturned())
-			{
-				st.ResultText(0,(*i)->PublicKey());
-			}
-		}
+		GetPublicKey((*i));
 
 		if((*i)->PublicKey()!=m_ids[identityid].m_publickey && (*i)->JoinedChannels().find(channel)!=(*i)->JoinedChannels().end())
 		{
@@ -1034,6 +1084,8 @@ const bool IRCServer::SetupClientSSL(IRCClientConnection::ssl_client_info &ssl, 
 		ssl_session_reset(&ssl.m_ssl);
 		ssl_set_bio(&ssl.m_ssl,net_recv,&socket,net_send,&socket);
 
+		// we do the handshake in the client thread now because it blocks
+		/*
 		ret=ssl_handshake(&ssl.m_ssl);
 		if(ret!=0)
 		{
@@ -1041,6 +1093,7 @@ const bool IRCServer::SetupClientSSL(IRCClientConnection::ssl_client_info &ssl, 
 			m_log->Error("IRCServer::SetupClientSSL couldn't handshake with client - return value = "+temp);
 			return false;
 		}
+		*/
 
 		return true;
 	}
@@ -1321,6 +1374,16 @@ void IRCServer::Update(const unsigned long ms)
 			params["nick"]=(*i)->Nick();
 			StringFunctions::Convert((*i)->LocalDBID(),params["localidentityid"]);
 
+			//send part to all joined channels and remove from channel ids
+			if((*i)->PeerDBID()>0)
+			{
+				for(std::set<std::string>::const_iterator j=(*i)->JoinedChannels().begin(); j!=(*i)->JoinedChannels().end(); j++)
+				{
+					SendPartMessageToClients((*i)->PeerDBID(),(*j));
+					m_idchannels[(*j)].erase((*i)->PeerDBID());
+				}
+			}
+
 			DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_IRC_USERQUIT,params));
 
 			m_log->Info("IRCServer::Update client connection deleted");
@@ -1354,36 +1417,15 @@ void IRCServer::Update(const unsigned long ms)
 	FD_ZERO(&readfs);
 	FD_ZERO(&writefs);
 
-	// put all listen sockets on the read fd set, as well as all the client sockets
-	if(m_clients.size()+m_listensockets.size()+m_ssllistensockets.size()<FD_SETSIZE)
+	for(std::vector<int>::iterator i=m_listensockets.begin(); i!=m_listensockets.end(); i++)
 	{
-		for(std::vector<int>::iterator i=m_listensockets.begin(); i!=m_listensockets.end(); i++)
-		{
-			FD_SET((*i),&readfs);
-			highsock=(std::max)((*i),highsock);
-		}
-		for(std::vector<int>::iterator i=m_ssllistensockets.begin(); i!=m_ssllistensockets.end(); i++)
-		{
-			FD_SET((*i),&readfs);
-			highsock=(std::max)((*i),highsock);
-		}
+		FD_SET((*i),&readfs);
+		highsock=(std::max)((*i),highsock);
 	}
-	else
+	for(std::vector<int>::iterator i=m_ssllistensockets.begin(); i!=m_ssllistensockets.end(); i++)
 	{
-		m_log->Error("IRCServer::Update too many existing connections.  Cannot accept new connections until a current connection closes.");
-	}
-	for(std::vector<IRCClientConnection *>::iterator i=m_clients.begin(); i!=m_clients.end(); i++)
-	{
-		if((*i)->IsConnected())
-		{
-			FD_SET((*i)->Socket(),&readfs);
-			highsock=(std::max)((*i)->Socket(),highsock);
-			if((*i)->SendBufferSize()>0)
-			{
-				FD_SET((*i)->Socket(),&writefs);
-				highsock=(std::max)((*i)->Socket(),highsock);
-			}
-		}
+		FD_SET((*i),&readfs);
+		highsock=(std::max)((*i),highsock);
 	}
 
 	// see if data is waiting on any of the sockets
@@ -1437,19 +1479,11 @@ void IRCServer::Update(const unsigned long ms)
 				}
 			}
 		}
+	}
 
-		// check for data on existing connections, or send data
-		for(std::vector<IRCClientConnection *>::iterator i=m_clients.begin(); i!=m_clients.end(); i++)
-		{
-			if(FD_ISSET((*i)->Socket(),&readfs))
-			{
-				(*i)->SocketReceive();
-			}
-			if((*i)->IsConnected()==true && FD_ISSET((*i)->Socket(),&writefs))
-			{
-				(*i)->SocketSend();
-			}
-		}
+	for(std::vector<IRCClientConnection *>::iterator i=m_clients.begin(); i!=m_clients.end(); i++)
+	{
+		(*i)->HandleReceivedData();
 	}
 
 }

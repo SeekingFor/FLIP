@@ -12,6 +12,8 @@ FreenetIdentityInserter::FreenetIdentityInserter(FreenetConnection *connection, 
 	Option option;
 	option.Get("MessageBase",m_messagebase);
 
+	m_timeout=10;
+
 }
 
 FreenetIdentityInserter::~FreenetIdentityInserter()

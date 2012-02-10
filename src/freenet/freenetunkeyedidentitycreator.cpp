@@ -43,9 +43,9 @@ const bool FreenetUnkeyedIdentityCreator::HandleFCPMessage(FCPv2::Message &messa
 				st.Bind(2,localidentityid);
 				st.Step();
 
-				st=m_db->Prepare("INSERT INTO tblIdentity(PublicKey,DateAdded,AddedMethod) VALUES(?,?,'Local identity');");
+				m_db->Prepare("UPDATE tblIdentity SET PublicKey=? WHERE RSAPublicKey=(SELECT RSAPublicKey FROM tblLocalIdentity WHERE LocalIdentityID=?);");
 				st.Bind(0,message["RequestURI"]);
-				st.Bind(1,now.Format("%Y-%m-%d %H:%M:%S"));
+				st.Bind(1,localidentityid);
 				st.Step();
 
 			}

@@ -44,6 +44,7 @@ private:
 	const bool NickInUse(IRCClientConnection *client, const std::string &nick) const;
 
 	const bool GetPeerDBID(IRCClientConnection *client);
+	void GetPublicKey(IRCClientConnection *client);
 
 	struct idinfo
 	{

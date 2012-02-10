@@ -14,6 +14,7 @@ SET(FLIP_SRC
 src/base64.cpp
 src/datetime.cpp
 src/dbsetup.cpp
+src/flipdaemon.cpp
 src/flipevent.cpp
 src/flipeventsource.cpp
 src/global.cpp
@@ -41,6 +42,7 @@ src/freenet/freenetnewidentityfinder.cpp
 src/freenet/freenetunkeyedidentitycreator.cpp
 src/irc/ircchannel.cpp
 src/irc/ircclientconnection.cpp
+src/irc/ircclientthread.cpp
 src/irc/irccommand.cpp
 src/irc/irccommandresponse.cpp
 src/irc/ircnick.cpp
@@ -69,6 +71,10 @@ ADD_SUBDIRECTORY(libs/librock)
 TARGET_LINK_LIBRARIES(flip librock)
 INCLUDE_DIRECTORIES(libs/librock)
 
+ADD_SUBDIRECTORY(libs/dlib)
+TARGET_LINK_LIBRARIES(flip dlib)
+INCLUDE_DIRECTORIES(libs/dlib)
+
 ADD_SUBDIRECTORY(libs/polarssl)
 TARGET_LINK_LIBRARIES(flip polarssl)
 INCLUDE_DIRECTORIES(libs/polarssl/include)
@@ -92,6 +98,9 @@ ENDIF(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
 IF(WIN32)
 	TARGET_LINK_LIBRARIES(flip ws2_32)
 	TARGET_LINK_LIBRARIES(flip iphlpapi)
+	ADD_DEFINITIONS(-D_WIN32_WINNT=0x0500)
+	ADD_DEFINITIONS(-D_WINSOCKAPI_)
+	ADD_DEFINITIONS(-DNOMINMAX)
 ENDIF(WIN32)
 
 # add -lxnet and -lsocket on solaris
