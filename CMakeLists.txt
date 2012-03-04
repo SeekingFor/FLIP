@@ -6,6 +6,7 @@ ENDIF(COMMAND CMAKE_POLICY)
 PROJECT(flip)
 
 OPTION(USE_BUNDLED_SQLITE "Use the bundled SQLite3 library." ON)
+OPTION(BUILD_PLUGIN "Build Freenet plugin." OFF)
 IF(APPLE)
 	SET(USE_BUNDLED_SQLITE ON)
 ENDIF(APPLE)
@@ -18,6 +19,7 @@ src/flipdaemon.cpp
 src/flipevent.cpp
 src/flipeventsource.cpp
 src/global.cpp
+src/jniwrapper.cpp
 src/logfile.cpp
 src/main.cpp
 src/option.cpp
@@ -54,7 +56,8 @@ FILE(GLOB_RECURSE FLIP_INC RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} include/*.h)
 
 # Create source groups for all sources and includes, in their original directory structure.
 FOREACH(SRC ${FLIP_SRC} ${FLIP_INC})
-	STRING(REGEX REPLACE ${CMAKE_CURRENT_SOURCE_DIR} "Files" REL_DIR "${SRC}")
+	STRING(REPLACE "+" "\\+" FIXED_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+	STRING(REGEX REPLACE ${FIXED_SOURCE_DIR} "Files" REL_DIR "${SRC}")
 	STRING(REGEX REPLACE "[\\\\/][^\\\\/]*$" "" REL_DIR "${REL_DIR}")
 	STRING(REGEX REPLACE "^[\\\\/]" "" REL_DIR "${REL_DIR}")
 	IF(REL_DIR)
@@ -66,6 +69,8 @@ FOREACH(SRC ${FLIP_SRC} ${FLIP_INC})
 ENDFOREACH(SRC)
 
 ADD_EXECUTABLE(flip ${FLIP_SRC} ${FLIP_INC})
+
+# BEGIN Library linking
 
 ADD_SUBDIRECTORY(libs/librock)
 TARGET_LINK_LIBRARIES(flip librock)
@@ -129,7 +134,13 @@ ELSE(SQLITE3_LIBRARY)
 	IF(NOT USE_BUNDLED_SQLITE)
 		MESSAGE(STATUS "Could not find system SQLite3 library.  Will compile from included source.")
 	ENDIF(NOT USE_BUNDLED_SQLITE)
-	ADD_LIBRARY(sqlite3 libs/sqlite3/sqlite3.c)
+	ADD_SUBDIRECTORY(libs/sqlite3)
 	TARGET_LINK_LIBRARIES(flip sqlite3)
 	INCLUDE_DIRECTORIES(libs/sqlite3)
 ENDIF(SQLITE3_LIBRARY)
+
+# END Library linking
+
+IF(BUILD_PLUGIN)
+	ADD_SUBDIRECTORY(plugin)
+ENDIF(BUILD_PLUGIN)

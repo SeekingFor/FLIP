@@ -118,6 +118,7 @@
 #include <complex>
 #include <map>
 #include <limits>
+#include <cstdio>
 #include "uintn.h"
 #include "interfaces/enumerable.h"
 #include "interfaces/map_pair.h"

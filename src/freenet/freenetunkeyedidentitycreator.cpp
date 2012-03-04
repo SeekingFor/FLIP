@@ -43,7 +43,7 @@ const bool FreenetUnkeyedIdentityCreator::HandleFCPMessage(FCPv2::Message &messa
 				st.Bind(2,localidentityid);
 				st.Step();
 
-				m_db->Prepare("UPDATE tblIdentity SET PublicKey=? WHERE RSAPublicKey=(SELECT RSAPublicKey FROM tblLocalIdentity WHERE LocalIdentityID=?);");
+				st=m_db->Prepare("UPDATE tblIdentity SET PublicKey=? WHERE RSAPublicKey=(SELECT RSAPublicKey FROM tblLocalIdentity WHERE LocalIdentityID=?);");
 				st.Bind(0,message["RequestURI"]);
 				st.Bind(1,localidentityid);
 				st.Step();

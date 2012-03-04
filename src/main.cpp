@@ -95,12 +95,14 @@ void handlesignal(int sig)
 
 int main(int argc, char *argv[])
 {
+#ifndef JNI_SUPPORT
 	signal(SIGINT,handlesignal);
 	signal(SIGTERM,handlesignal);
+#endif
 
 	int loglevel=LogFile::LOGLEVEL_DEBUG;
 	Option option;
-	global::db.Open("flip.db3");
+	global::db.Open(global::basepath+"flip.db3");
 	global::daemon=false;
 	global::shutdown=false;
 	bool startup=true;
@@ -128,14 +130,14 @@ int main(int argc, char *argv[])
 	IRCServer irc;
 	FreenetConnection fn;
 
-	unlink("flip-5.log");
-	rename("flip-4.log","flip-5.log");
-	rename("flip-3.log","flip-4.log");
-	rename("flip-2.log","flip-3.log");
-	rename("flip-1.log","flip-2.log");
-	rename("flip.log","flip-1.log");
+	unlink(std::string(global::basepath+"flip-5.log").c_str());
+	rename(std::string(global::basepath+"flip-4.log").c_str(),std::string(global::basepath+"flip-5.log").c_str());
+	rename(std::string(global::basepath+"flip-3.log").c_str(),std::string(global::basepath+"flip-4.log").c_str());
+	rename(std::string(global::basepath+"flip-2.log").c_str(),std::string(global::basepath+"flip-3.log").c_str());
+	rename(std::string(global::basepath+"flip-1.log").c_str(),std::string(global::basepath+"flip-2.log").c_str());
+	rename(std::string(global::basepath+"flip.log").c_str(),std::string(global::basepath+"flip-1.log").c_str());
 
-	global::log.SetFileName("flip.log");
+	global::log.SetFileName(global::basepath+"flip.log");
 	global::log.OpenFile();
 	global::log.SetWriteDate(true);
 	global::log.SetWriteLogLevel(true);
