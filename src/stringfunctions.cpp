@@ -80,6 +80,18 @@ std::string TrimWhitespace(const std::string &str)
 	return returnstring;
 }
 
+std::string TrimTrailingWhitespace(const std::string &str)
+{
+	std::string returnstring=str;
+	
+	while(returnstring.size()>0 && returnstring.find_last_of(" \t\r\n")==returnstring.size()-1)
+	{
+		returnstring.erase(returnstring.size()-1,1);
+	}
+
+	return returnstring;
+}
+
 void UpperCase(const std::string &str, std::string &output)
 {
 	output=str;

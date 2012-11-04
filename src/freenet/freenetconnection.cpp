@@ -155,9 +155,12 @@ void FreenetConnection::Update(const unsigned long ms)
 		}
 
 		// do any periodic processing
-		for(std::vector<IPeriodicProcessor *>::iterator i=m_periodicprocessors.begin(); i!=m_periodicprocessors.end(); i++)
+		if(m_receivednodehello)
 		{
-			(*i)->Process();
+			for(std::vector<IPeriodicProcessor *>::iterator i=m_periodicprocessors.begin(); i!=m_periodicprocessors.end(); i++)
+			{
+				(*i)->Process();
+			}
 		}
 
 	}

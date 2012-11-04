@@ -29,9 +29,29 @@ const bool IRCChannel::SetName(const std::string &name)
 	}
 }
 
+const bool IRCChannel::SetTopic(const std::string &topic)
+{
+	if(! ValidTopic(topic))
+	{
+		return false;
+	}
+	
+	m_topic=topic;
+	m_topicset=true;
+	
+	return true;
+}
+
 const bool IRCChannel::ValidName(const std::string &name)
 {
 	static std::string invalidchars("\x00\x07\x0a\x0d ,:");
 	
 	return (name.find_first_of(invalidchars)==std::string::npos && name.size()>0);
+}
+
+const bool IRCChannel::ValidTopic(const std::string &topic)
+{
+	static std::string invalidchars("\x00\x07\x0a\x0d");
+	
+	return (topic.find_first_of(invalidchars)==std::string::npos && topic.size()>0);
 }

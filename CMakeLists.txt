@@ -15,6 +15,7 @@ SET(FLIP_SRC
 src/base64.cpp
 src/datetime.cpp
 src/dbsetup.cpp
+src/dbconversions.cpp
 src/flipdaemon.cpp
 src/flipevent.cpp
 src/flipeventsource.cpp

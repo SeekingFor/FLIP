@@ -45,8 +45,19 @@ IRCServer::IRCServer():m_servername("flip")
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_CONNECTED,this);
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_DISCONNECTED,this);
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_KEEPALIVE,this);
+	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_FREENET_SETTOPIC,this);
 	m_sslsetup=false;
+	dbInitChannels();
 }
+
+struct second_deleter
+{
+	template<typename T>
+	void operator()(const T& v) const
+	{
+		delete v.second;
+	}
+};
 
 IRCServer::~IRCServer()
 {
@@ -54,6 +65,8 @@ IRCServer::~IRCServer()
 	WSACleanup();
 #endif
 	ShutdownServerSSL();
+	
+	std::for_each(m_channels.begin(), m_channels.end(), second_deleter());
 }
 
 const bool IRCServer::GetPeerDBID(IRCClientConnection *client)
@@ -73,6 +86,43 @@ const bool IRCServer::GetPeerDBID(IRCClientConnection *client)
 		}
 	}
 	return false;
+}
+
+void IRCServer::dbAddChannel(IRCChannel* chan) const
+{
+	SQLite3DB::Statement st=m_db->Prepare("INSERT INTO tblChannel(Name, Topic) VALUES(?,?);");
+	st.Bind(0, chan->GetName());
+	st.Bind(1, chan->GetTopic());
+	st.Step();
+}
+
+void IRCServer::dbUpdateChannel(IRCChannel* chan) const
+{
+	SQLite3DB::Statement st=m_db->Prepare("UPDATE tblChannel set Topic=? WHERE Name=?;");
+	st.Bind(0, chan->GetTopic());
+	st.Bind(1, chan->GetName());
+	st.Step();
+}
+
+void IRCServer::dbInitChannels()
+{
+	SQLite3DB::Recordset rs=m_db->Query("SELECT Name,Topic FROM tblChannel;");
+	if(! rs.Count())
+	{
+		return;
+	}
+
+	while(!rs.AtEnd())
+	{
+		std::string name(rs.GetField(0));
+		std::string topic(rs.GetField(1));
+		
+		IRCChannel* chan = new IRCChannel();
+		chan->SetName(name);
+		chan->SetTopic(topic);
+		m_channels[name]=chan;
+		rs.Next();
+	}
 }
 
 void IRCServer::GetPublicKey(IRCClientConnection *client)
@@ -196,7 +246,7 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 				{
 					client->User()=command.GetParameters()[0];
 				}
-				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_WELCOME,client->Nick(),":Welcome to the Freenet IRC network"));
+				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_WELCOME,client->Nick(),":Welcome to the Freenet IRC network "+client->Nick()));
 				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_YOURHOST,client->Nick(),":Your host is "+m_servername+" running version "+FLIP_VERSION));
 				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_CREATED,client->Nick(),":This server was created "+m_datestarted.Format("%Y-%m-%d")));
 				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_MYINFO,client->Nick(),m_servername+" "+FLIP_VERSION+" s v"));
@@ -223,6 +273,80 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 			}
 		}
 	}
+	else if(command.GetCommand()=="TOPIC")
+	{
+		if(command.GetParameters().size()>0)
+		{
+			std::string name = command.GetParameters()[0];
+			IRCChannel* chan = GetChannel(name);
+			
+			if(chan==NULL)
+			{
+				// Name is not valid
+				return true;
+			}
+			
+			if(command.GetParameters().size()>1)
+			{
+				// change topic
+				
+				if(client->JoinedChannels().find(name)==client->JoinedChannels().end())
+				{
+					//~ client is not in channel
+					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::ERR_NOTONCHANNEL,client->Nick(),chan->GetName()+" :You're not on that channel"));
+					return true;
+				}
+				
+				std::string command_str = command.GetCommandString();
+				size_t pos = command_str.find(":");
+				
+				if(pos==std::string::npos)
+				{
+					return true;
+				}
+				
+				std::string topic = command_str.substr(pos+1);
+				
+				if(chan->GetTopic()==topic)
+				{
+					return true;
+				}
+				
+				if(chan->SetTopic(topic)) //~ is the topic valid?
+				{
+					dbUpdateChannel(chan);
+					std::map<std::string,std::string> params;
+					params["nick"]=client->Nick();
+					StringFunctions::Convert(client->LocalDBID(),params["localidentityid"]);
+					params["channel"]=chan->GetName();
+					params["topic"]=chan->GetTopic();
+					
+					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_TOPIC,client->Nick(),chan->GetName()+" :"+chan->GetTopic()));
+					DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_IRC_SETTOPIC,params));
+				}
+				else
+				{
+					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_NOTOPIC,client->Nick(),chan->GetName()+" :No topic is set"));
+				}
+			}
+			else
+			{
+				// view topic
+				if(chan->GetTopicSet())
+				{
+					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_TOPIC,client->Nick(),chan->GetName()+" :"+chan->GetTopic()));
+				}
+				else
+				{
+					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_NOTOPIC,client->Nick(),chan->GetName()+" :No topic is set"));
+				}
+			}
+		}
+		else
+		{
+			client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::ERR_NEEDMOREPARAMS,client->Nick(),"TOPIC :Not enough parameters"));
+		}
+	}
 	else if(command.GetCommand()=="JOIN")
 	{
 		if(command.GetParameters().size()>0)
@@ -232,11 +356,16 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 
 			for(std::vector<std::string>::iterator i=channels.begin(); i!=channels.end(); i++)
 			{
-				if((*i).size()>0 && (*i)[0]=='#' && IRCChannel::ValidName((*i)))
+				if((*i).size()>0 && (*i)[0]=='#')
 				{
 					std::string joinednicks(client->Nick());
-					IRCChannel chan;
-					chan.SetName((*i));
+					IRCChannel* pChan;
+					if( (pChan = GetChannel(*i))==NULL )
+					{
+						//~ Channel name is not valid
+						continue;
+					}
+					IRCChannel& chan = *pChan;
 
 					for(std::set<int>::iterator j=m_idchannels[chan.GetName()].begin(); j!=m_idchannels[chan.GetName()].end(); j++)
 					{
@@ -249,7 +378,16 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 					}
 
 					client->SendCommand(IRCCommand(":"+client->Nick()+"!n="+client->User()+"@freenet JOIN :"+chan.GetName()));
-					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_NOTOPIC,client->Nick(),chan.GetName()+" :No topic set"));
+					
+					if(chan.GetTopicSet())
+					{
+						client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_TOPIC,client->Nick(),chan.GetName()+" :"+chan.GetTopic()));
+					}
+					else
+					{
+						client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_NOTOPIC,client->Nick(),chan.GetName()+" :No topic is set"));
+					}
+					
 					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_NAMREPLY,client->Nick()," = "+chan.GetName()+" :"+joinednicks));
 					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_ENDOFNAMES,client->Nick()," "+chan.GetName()+" :End of names"));
 
@@ -406,9 +544,11 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 		{
 			for(std::map<std::string,std::set<int> >::iterator i=m_idchannels.begin(); i!=m_idchannels.end(); i++)
 			{
+				IRCChannel* chan = GetChannel((*i).first);
+				if(chan==NULL) {continue;}
 				std::string countstr("0");
 				StringFunctions::Convert((*i).second.size(),countstr);
-				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_LIST,client->Nick(),(*i).first+" "+countstr+" :"));
+				client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_LIST,client->Nick(),(*i).first+" "+countstr+" :"+chan->GetTopic()));
 			}
 		}
 		// list only specific channels
@@ -418,16 +558,15 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 			StringFunctions::Split(command.GetParameters()[0],",",channels);
 			for(std::vector<std::string>::iterator i=channels.begin(); i!=channels.end(); i++)
 			{
-				if(IRCChannel::ValidName((*i))==true)
+				IRCChannel* chan = GetChannel(*i);
+				if(chan!=NULL)
 				{
-					IRCChannel chan;
-					chan.SetName((*i));
 					std::string countstr("0");
-					if(m_idchannels.find(chan.GetName())!=m_idchannels.end())
+					if(m_idchannels.find(chan->GetName())!=m_idchannels.end())
 					{
-						StringFunctions::Convert((*m_idchannels.find(chan.GetName())).second.size(),countstr);
+						StringFunctions::Convert((*m_idchannels.find(chan->GetName())).second.size(),countstr);
 					}
-					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_LIST,client->Nick(),chan.GetName()+" "+countstr+" :"));
+					client->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_LIST,client->Nick(),chan->GetName()+" "+countstr+" :"+chan->GetTopic()));
 				}
 			}
 		}
@@ -507,7 +646,8 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 	}
 	else if(command.GetCommand()=="WHOIS")
 	{
-		if(command.GetParameters().size()==1)
+		/* allow (but ignore) a second parameter, some clients do WHOIS <nick> <nick> */
+		if((command.GetParameters().size()==1) || (command.GetParameters().size()==2))
 		{
 			int identityid=0;
 			std::string idlestr("");
@@ -835,7 +975,12 @@ void IRCServer::ProcessFLIPEvent(const int identityid, const FLIPEvent &flipeven
 	}
 	else if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_NEWCHANNELMESSAGE)
 	{
-		SendChannelMessageToClients(identityid,params["channel"],params["message"]);
+		SendChannelMessageToClients(identityid,params["channel"],StringFunctions::TrimTrailingWhitespace(params["message"]));
+		m_ids[identityid].m_lastircactivity.SetNowUTC();
+	}
+	else if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_SETTOPIC)
+	{
+		SendTopicToClients(identityid,params["channel"],StringFunctions::TrimTrailingWhitespace(params["topic"]));
 		m_ids[identityid].m_lastircactivity.SetNowUTC();
 	}
 	else if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_NEWPRIVATEMESSAGE)
@@ -926,6 +1071,48 @@ void IRCServer::SendChannelMessageToClients(const int identityid, const std::str
 		if((*i)->PublicKey()!=m_ids[identityid].m_publickey && (*i)->JoinedChannels().find(channel)!=(*i)->JoinedChannels().end())
 		{
 			(*i)->SendCommand(IRCCommand(":"+m_ids[identityid].m_nick+"_"+idstr+" PRIVMSG "+channel+" :"+message));
+		}
+	}
+}
+
+void IRCServer::SendTopicToClients(const int identityid, const std::string &channel, const std::string &topic)
+{
+	// insert sender into ids list if he isn't already there
+	if(m_ids.find(identityid)==m_ids.end())
+	{
+		SQLite3DB::Statement st=m_db->Prepare("SELECT Name, PublicKey FROM tblIdentity WHERE IdentityID=?;");
+		st.Bind(0,identityid);
+		st.Step();
+		if(st.RowReturned())
+		{
+			st.ResultText(0,m_ids[identityid].m_nick);
+			st.ResultText(1,m_ids[identityid].m_publickey);
+		}
+	}
+	
+	// make sure identity is joined to channel
+	if(m_idchannels[channel].find(identityid)==m_idchannels[channel].end())
+	{
+		m_idchannels[channel].insert(identityid);
+		SendJoinMessageToClients(identityid,channel);
+	}
+	
+	IRCChannel* chan = GetChannel(channel);
+	if(chan==NULL) return;
+	if(chan->GetTopic()==topic) return;
+	
+	chan->SetTopic(topic);
+	dbUpdateChannel(chan);
+	
+	// send topic to connected clients
+	for(std::vector<IRCClientConnection *>::iterator i=m_clients.begin(); i!=m_clients.end(); i++)
+	{
+		GetPublicKey((*i));
+
+		// don't resend the topic to the client that set it in the first place
+		if((*i)->PublicKey()!=m_ids[identityid].m_publickey && (*i)->JoinedChannels().find(channel)!=(*i)->JoinedChannels().end())
+		{
+			(*i)->SendCommand(IRCCommandResponse::MakeCommand(m_servername,IRCCommandResponse::RPL_TOPIC,m_ids[identityid].m_nick,channel+" :"+chan->GetTopic()));
 		}
 	}
 }
@@ -1486,4 +1673,25 @@ void IRCServer::Update(const unsigned long ms)
 		(*i)->HandleReceivedData();
 	}
 
+}
+IRCChannel* IRCServer::GetChannel(const std::string& name)
+{
+	if(m_channels.find(name)==m_channels.end())
+	{
+		IRCChannel* chan = new IRCChannel();
+		if(chan->SetName(name))
+		{
+			dbAddChannel(chan);
+			m_channels[name] = chan;
+			return chan;
+		}
+		else
+		{
+			return NULL;
+		}
+	}
+	else
+	{
+		return m_channels[name];
+	}
 }

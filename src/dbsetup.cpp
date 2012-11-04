@@ -1,4 +1,5 @@
 #include "dbsetup.h"
+#include "dbconversions.h"
 #include "option.h"
 #include "db/sqlite3db.h"
 
@@ -21,13 +22,20 @@ void SetupDB(SQLite3DB::DB *db)
 		st.ResultInt(0,major);
 		st.ResultInt(1,minor);
 		st.Finalize();
+		
+		if(major==0 && minor==1)
+		{
+			ConvertDB0001To0002(db);
+			major=0;
+			minor=2;
+		}
 	}
 	else
 	{
-		db->Execute("INSERT INTO tblDBVersion(Major,Minor) VALUES(0,1);");
+		db->Execute("INSERT INTO tblDBVersion(Major,Minor) VALUES(0,2);");
 	}
 
-	db->Execute("UPDATE tblDBVersion SET Major=0, Minor=1;");
+	db->Execute("UPDATE tblDBVersion SET Major=0, Minor=2;");
 
 	db->Execute("CREATE TABLE IF NOT EXISTS tblOption(\
 				Option				TEXT UNIQUE,\
@@ -95,10 +103,17 @@ void SetupDB(SQLite3DB::DB *db)
 
 	db->Execute("CREATE TABLE IF NOT EXISTS tblAnnounceIndex(\
 				Date					DATE,\
-				AnnounceIndex			INTEGER\
+				AnnounceIndex			INTEGER,\
+				Done					BOOL CHECK(Done IN (0,1)) DEFAULT 0\
 				);");
 
 	db->Execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_AnnounceIndex ON tblAnnounceIndex(Date,AnnounceIndex);");
+
+	db->Execute("CREATE TABLE IF NOT EXISTS tblChannel(\
+		ChannelID			INTEGER PRIMARY KEY,\
+		Name				TEXT,\
+		Topic				TEXT\
+		);");
 
 	// run analyze - may speed up some queries
 	db->Execute("ANALYZE;");

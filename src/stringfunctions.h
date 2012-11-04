@@ -79,9 +79,14 @@ void Split(const std::string &str, const std::string &delim, std::vector<std::st
 void SplitMultiple(const std::string &str, const std::string &delim, std::vector<std::string> &output);
 
 /**
-	\brief Trims whitespace from beginning and end of string
+	\brief Trims whitespace from beginning to end of string
 */
 std::string TrimWhitespace(const std::string &str);
+
+/**
+	\brief Trims trailing whitespace in a string
+*/
+std::string TrimTrailingWhitespace(const std::string &str);
 
 /**
 	\brief Converts a string to upper case

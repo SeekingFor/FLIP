@@ -11,6 +11,8 @@ FreenetIdentityAnnouncer::FreenetIdentityAnnouncer(FreenetConnection *connection
 	Option option;
 	option.Get("MessageBase",m_messagebase);
 
+	m_db->Execute("DELETE FROM tblAnnounceIndex WHERE Done=0;");
+
 }
 
 FreenetIdentityAnnouncer::~FreenetIdentityAnnouncer()
@@ -25,11 +27,13 @@ void FreenetIdentityAnnouncer::FCPConnected()
 	{
 		(*i).second.m_announcing=false;
 	}
+	m_db->Execute("DELETE FROM tblAnnounceIndex WHERE Done=0;");
 }
 
 void FreenetIdentityAnnouncer::FCPDisconnected()
 {
 	m_lastactivity.SetNowUTC();
+	m_db->Execute("DELETE FROM tblAnnounceIndex WHERE Done=0;");
 }
 
 const bool FreenetIdentityAnnouncer::HandleFCPMessage(FCPv2::Message &message)
@@ -52,26 +56,30 @@ const bool FreenetIdentityAnnouncer::HandleFCPMessage(FCPv2::Message &message)
 
 		if(message.GetName()=="PutSuccessful")
 		{
-			SQLite3DB::Statement st=m_db->Prepare("INSERT INTO tblAnnounceIndex(Date,AnnounceIndex) VALUES(?,?);");
+			m_ids[id].m_lastannounced.SetNowUTC();
+			m_ids[id].m_announcing=false;
+
+			SQLite3DB::Statement st=m_db->Prepare("INSERT OR REPLACE INTO tblAnnounceIndex(Date,AnnounceIndex,Done) VALUES(?,?,1);");
 			st.Bind(0,idparts[2]);
 			st.Bind(1,index);
 			st.Step();
-
-			m_ids[id].m_lastannounced.SetNowUTC();
-			m_ids[id].m_announcing=false;
 
 			m_log->Debug("FreenetIdentityAnnouncer::HandleFCPMessage announced "+message["Identifier"]);
 			return true;
 		}
 		else if(message.GetName()=="PutFailed")
 		{
-			SQLite3DB::Statement st=m_db->Prepare("INSERT INTO tblAnnounceIndex(Date,AnnounceIndex) VALUES(?,?);");
-			st.Bind(0,idparts[2]);
-			st.Bind(1,index);
-			st.Step();
-
 			m_log->Debug("FreenetIdentityAnnouncer::HandleFCPMessage PutFailed "+message["Identifier"]+"  Code="+message["Code"]+"  Description="+message["CodeDescription"]);
 			m_ids[id].m_announcing=false;
+
+			if(message["Fatal"]=="true")
+			{
+				SQLite3DB::Statement st=m_db->Prepare("INSERT OR REPLACE INTO tblAnnounceIndex(Date,AnnounceIndex,Done) VALUES(?,?,1);");
+				st.Bind(0,idparts[2]);
+				st.Bind(1,index);
+				st.Step();
+			}
+
 			return true;
 		}
 		else if(message.GetName()=="IdentifierCollision")
@@ -185,6 +193,11 @@ void FreenetIdentityAnnouncer::StartInsert(const int localidentityid)
 		m_fcp->Send(std::vector<char>(data.begin(),data.end()));
 
 		m_ids[localidentityid].m_announcing=true;
+
+		st=m_db->Prepare("INSERT INTO tblAnnounceIndex(Date,AnnounceIndex) VALUES(?,?);");
+		st.Bind(0,now.Format("%Y-%m-%d"));
+		st.Bind(1,indexstr);
+		st.Step();
 
 		m_log->Debug("FreenetIdentityAnnouncer::StartInsert started announce "+mess["Identifier"]);
 

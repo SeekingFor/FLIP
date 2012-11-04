@@ -107,6 +107,17 @@ const bool FreenetMessageDownloader::HandleFCPMessage(FCPv2::Message &message)
 
 							DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_FREENET_KEEPALIVE,params));
 						}
+						else if(fm["type"]=="settopic")
+						{
+							params["identityid"]=idparts[1];
+							StringFunctions::LowerCase(fm["channel"],params["channel"]);
+							params["sentdate"]=fm["sentdate"];
+							params["topic"]=fm.Body();
+							params["insertday"]=idparts[2];
+							params["edition"]=idparts[3];
+							
+							DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_FREENET_SETTOPIC,params));
+						}
 						else
 						{
 							m_log->Debug("FreenetMessageDownloader::HandleFCPMessage don't know how to handle "+fm["type"]+" for "+message["Identifier"]);

@@ -110,7 +110,7 @@ const bool FreenetMessageFinder::HandleFLIPEvent(const FLIPEvent &flipevent)
 				st.ResultText(0,publickey);
 			}
 
-			if(m_subscribed[date].find(id)==m_subscribed[date].end())
+			if(m_subscribed[date].find(id)==m_subscribed[date].end() && publickey!="")
 			{
 				Subscribe(id,publickey,date,lastindex+1);
 			}
@@ -283,17 +283,24 @@ void FreenetMessageFinder::Subscribe(const int identityid, const std::string &pu
 	StringFunctions::Convert(edition,editionstr);
 	StringFunctions::Convert(identityid,idstr);
 
-	mess["URI"]="USK@"+publickey.substr(4)+m_messagebase+"|"+date.Format("%Y-%m-%d")+"|Message/"+editionstr;
-	mess["Identifier"]=m_fcpuniqueidentifier+"|"+idstr+"|"+date.Format("%Y-%m-%d");
-	mess["PriorityClass"]="3";
-	mess["PriorityClassProgress"]="2";
+	if(publickey!="")
+	{
+		mess["URI"]="USK@"+publickey.substr(4)+m_messagebase+"|"+date.Format("%Y-%m-%d")+"|Message/"+editionstr;
+		mess["Identifier"]=m_fcpuniqueidentifier+"|"+idstr+"|"+date.Format("%Y-%m-%d");
+		mess["PriorityClass"]="3";
+		mess["PriorityClassProgress"]="2";
 
-	m_fcp->Send(mess);
+		m_fcp->Send(mess);
 
-	day.Set(date.Year(),date.Month(),date.Day(),0,0,0);
-	m_subscribed[day].insert(identityid);
+		day.Set(date.Year(),date.Month(),date.Day(),0,0,0);
+		m_subscribed[day].insert(identityid);
 
-	m_log->Debug("FreenetMessageFinder::Subscribe subscribed to "+mess["URI"]);
+		m_log->Debug("FreenetMessageFinder::Subscribe subscribed to "+mess["URI"]);
+	}
+	else
+	{
+		m_log->Error("FreenetMessageFinder::Subscribe was passed empty public key");
+	}
 }
 
 void FreenetMessageFinder::Unsubscribe(const int identityid, const DateTime date)

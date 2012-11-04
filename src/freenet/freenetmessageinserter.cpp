@@ -13,6 +13,7 @@ FreenetMessageInserter::FreenetMessageInserter(FreenetConnection *connection, FC
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_IRC_JOINCHANNEL,this);
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_IRC_PARTCHANNEL,this);
 	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_IRC_KEEPALIVE,this);
+	FLIPEventSource::RegisterFLIPEventHandler(FLIPEvent::EVENT_IRC_SETTOPIC,this);
 
 	Option option;
 	option.Get("MessageBase",m_messagebase);
@@ -102,6 +103,15 @@ const bool FreenetMessageInserter::HandleFLIPEvent(const FLIPEvent &flipevent)
 
 		StartChannelInsert(id,params["channel"],params["message"]);
 
+		return true;
+	}
+	else if(flipevent.GetType()==FLIPEvent::EVENT_IRC_SETTOPIC && m_fcp->IsConnected())
+	{
+		std::map<std::string,std::string> params=flipevent.GetParameters();
+		int id=0;
+		StringFunctions::Convert(params["localidentityid"],id);
+
+		StartTopicInsert(id,params["channel"],params["topic"]);
 		return true;
 	}
 	else if(flipevent.GetType()==FLIPEvent::EVENT_IRC_PRIVATEMESSAGE && m_fcp->IsConnected())
@@ -217,6 +227,54 @@ void FreenetMessageInserter::StartChannelInsert(const int localidentityid, const
 		m_fcp->Send(std::vector<char>(data.begin(),data.end()));
 
 		m_log->Debug("FreenetMessageInserter::StartInsert started insert of channel message "+mess["Identifier"]);
+	}
+}
+
+void FreenetMessageInserter::StartTopicInsert(const int localidentityid, const std::string &channel, const std::string &topic)
+{
+	SQLite3DB::Statement st;
+	std::string idstr("");
+	std::string data("");
+	std::string datalengthstr("");
+	DateTime now;
+	FCPv2::Message mess("ClientPut");
+
+	LoadLocalIdentityPrivateKey(localidentityid);
+
+	if(m_identitykeys[localidentityid]!="")
+	{
+		std::string indexstr("0");
+		FreenetMessage fm;
+
+		fm["type"]="settopic";
+		fm["channel"]=channel;
+		fm["sentdate"]=now.Format("%Y-%m-%d %H:%M:%S");
+		fm.Body()=topic;
+		data=fm.GetMessageText();
+
+		StringFunctions::Convert(localidentityid,idstr);
+		StringFunctions::Convert(data.size(),datalengthstr);
+		StringFunctions::Convert(GetNextMessageIndex(localidentityid,now),indexstr);
+		
+		st=m_db->Prepare("INSERT INTO tblInsertedMessageIndex(LocalIdentityID,Date,MessageIndex) VALUES(?,?,?);");
+		st.Bind(0,localidentityid);
+		st.Bind(1,now.Format("%Y-%m-%d"));
+		st.Bind(2,indexstr);
+		st.Step();
+		
+		mess["URI"]="SSK@"+m_identitykeys[localidentityid].substr(4)+m_messagebase+"|"+now.Format("%Y-%m-%d")+"|Message-"+indexstr;
+		mess["Identifier"]=m_fcpuniqueidentifier+"|"+idstr+"|"+now.Format("%Y-%m-%d")+"|"+indexstr+"|"+mess["URI"];
+		mess["RealTimeFlag"]="true";
+		mess["UploadFrom"]="direct";
+		mess["PriorityClass"]=m_insertpriority;
+		mess["ExtraInsertsSingleBlock"]="0";
+		mess["DataLength"]=datalengthstr;
+		mess["Metadata.ContentType"]="";
+
+		m_fcp->Send(mess);
+		m_fcp->Send(std::vector<char>(data.begin(),data.end()));
+
+		m_log->Debug("FreenetMessageInserter::StartInsert started insert of channel topic "+mess["Identifier"]);
 	}
 }
 

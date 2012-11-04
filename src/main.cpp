@@ -65,7 +65,7 @@ void handleoptions(const std::vector<std::string> &options, bool &startup)
 		{
 			if(option.Get((*i).substr(2,pos-2),val)==true)
 			{
-				option.Set((*i).substr(2,pos-2),(*i).substr(pos+2));
+				option.Set((*i).substr(2,pos-2),(*i).substr(pos+1));
 				startup=false;
 			}
 		}

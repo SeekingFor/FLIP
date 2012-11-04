@@ -8,6 +8,7 @@
 #include "../datetime.h"
 #include "ircclientconnection.h"
 #include "irccommandhandler.h"
+#include "ircchannel.h"
 
 #include <polarssl/ssl.h>
 
@@ -31,6 +32,7 @@ public:
 
 private:
 	void SendChannelMessageToClients(const int identityid, const std::string &channel, const std::string &message);
+	void SendTopicToClients(const int identityid, const std::string &channel, const std::string &topic);
 	void SendPrivateMessageToClients(const int identityid, const std::string &recipient, const std::string &encryptedmessage);
 	void SendJoinMessageToClients(const int identityid, const std::string &channel);
 	void SendPartMessageToClients(const int identityid, const std::string &channel);
@@ -45,6 +47,10 @@ private:
 
 	const bool GetPeerDBID(IRCClientConnection *client);
 	void GetPublicKey(IRCClientConnection *client);
+	IRCChannel* GetChannel(const std::string&); 
+	void dbAddChannel(IRCChannel* chan) const;
+	void dbUpdateChannel(IRCChannel* chan) const;
+	void dbInitChannels();
 
 	struct idinfo
 	{
@@ -83,6 +89,7 @@ private:
 	std::map<int,idinfo> m_ids;
 	std::map<std::string,std::set<int> > m_idchannels;	// channels each id is in
 	std::set<int> m_idhassent;							// contains id if that identity has already sent a message within the window - we will accept all messages after no matter when they were sent
+	std::map<std::string, IRCChannel*> m_channels;					// known channels
 
 	std::vector<std::string> m_motdlines;
 	struct ssl_server_info

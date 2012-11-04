@@ -42,7 +42,7 @@ const bool FreenetNewIdentityFinder::HandleFCPMessage(FCPv2::Message &message)
 
 			if(idparts.size()>2)
 			{
-				SQLite3DB::Statement st=m_db->Prepare("INSERT INTO tblAnnounceIndex(Date,AnnounceIndex) VALUES(?,?);");
+				SQLite3DB::Statement st=m_db->Prepare("INSERT INTO tblAnnounceIndex(Date,AnnounceIndex,Done) VALUES(?,?,1);");
 				st.Bind(0,idparts[2]);
 				st.Bind(1,idparts[1]);
 				st.Step();
@@ -88,7 +88,7 @@ const bool FreenetNewIdentityFinder::HandleFCPMessage(FCPv2::Message &message)
 
 				if(idparts.size()>2)
 				{
-					SQLite3DB::Statement st=m_db->Prepare("INSERT INTO tblAnnounceIndex(Date,AnnounceIndex) VALUES(?,?);");
+					SQLite3DB::Statement st=m_db->Prepare("INSERT INTO tblAnnounceIndex(Date,AnnounceIndex,Done) VALUES(?,?,1);");
 					st.Bind(0,idparts[2]);
 					st.Bind(1,idparts[1]);
 					st.Step();

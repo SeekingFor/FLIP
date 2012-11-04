@@ -10,7 +10,7 @@ IRCCommand::IRCCommand(const std::string &commandstring)
 	std::string textparam("");
 	bool intextparam=false;
 
-	m_commandstring=commandstring;
+	m_commandstring=StringFunctions::TrimTrailingWhitespace(commandstring);
 	StringFunctions::Split(m_commandstring," ",commandparts);
 
 	// prefix
@@ -34,7 +34,7 @@ IRCCommand::IRCCommand(const std::string &commandstring)
 		if(intextparam==false && commandparts[pos].size()>0 && commandparts[pos][0]==':')
 		{
 			intextparam=true;
-			textparam=commandparts[pos];
+			textparam=commandparts[pos].substr(1);	// get rid of :
 		}
 		// end of text param :
 		//else if(intextparam==true && commandparts[pos].size()>0 && commandparts[pos][commandparts[pos].size()-1]==':')

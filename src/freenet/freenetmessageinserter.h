@@ -27,6 +27,7 @@ public:
 
 private:
 	void StartChannelInsert(const int localidentityid, const std::string &channel, const std::string &message);
+	void StartTopicInsert(const int localidentityid, const std::string &channel, const std::string &topic);
 	void StartPrivateInsert(const int localidentityid, const int recipientidentityid, const std::string &message);
 	void StartJoinChannelInsert(const int localidentityid, const std::string &channel);
 	void StartPartChannelInsert(const int localidentityid, const std::string &channel);

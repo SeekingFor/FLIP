@@ -43,7 +43,7 @@ public:
 	void UnsetMode(const int mode)			{ m_mode&=(~mode); }
 	const int GetMode() const				{ return m_mode; }
 	const bool GetTopicSet() const			{ return m_topicset; }
-	void SetTopic(const std::string &topic)	{ m_topic=topic; m_topicset=true; }
+	const bool SetTopic(const std::string &topic);
 	const std::string &GetTopic() const		{ return m_topic; }
 	void UnsetTopic()						{ m_topic=""; m_topicset=false; }
 	/* May also set type if there is a prefix on the name */
@@ -52,6 +52,7 @@ public:
 	const char GetPrefix() const;
 	
 	static const bool ValidName(const std::string &name);
+	static const bool ValidTopic(const std::string &topic);
 	
 	const bool operator==(const IRCChannel &rhs)	{ return GetName(true)==rhs.GetName(true); }
 	const bool operator<(const IRCChannel &rhs)		{ return GetName(true)<rhs.GetName(true); }
