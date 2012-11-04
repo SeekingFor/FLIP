@@ -457,9 +457,9 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 				chan.SetName(command.GetParameters()[0]);
 
 				std::vector<std::string>::const_iterator i=(command.GetParameters().begin()+1);
-				if((*i).size()>0 && (*i)[0]==':')
+				if((*i).size()>0)
 				{
-					message+=(*i).substr(1);
+					message+=(*i);
 				}
 				i++;
 				for(;i!=command.GetParameters().end(); i++)
@@ -483,9 +483,9 @@ const bool IRCServer::HandleCommand(const IRCCommand &command, IRCClientConnecti
 				int recipientid=0;
 				std::string message("");
 				std::vector<std::string>::const_iterator i=(command.GetParameters().begin()+1);
-				if((*i).size()>0 && (*i)[0]==':')
+				if((*i).size()>0)
 				{
-					message+=(*i).substr(1);
+					message+=(*i);
 				}
 				i++;
 				for(;i!=command.GetParameters().end(); i++)
