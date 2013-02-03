@@ -38,7 +38,7 @@ const bool FreenetMessageFinder::HandleFCPMessage(FCPv2::Message &message)
 {
 	if(message["Identifier"].find(m_fcpuniqueidentifier)==0)
 	{
-		if(message.GetName()=="SubscribedUSK")
+		if(message.GetName()=="SubscribedUSK" || message.GetName()=="SubscribedUSKSendingToNetwork" || message.GetName()=="SubscribedUSKRoundFinished")
 		{
 			return true;
 		}

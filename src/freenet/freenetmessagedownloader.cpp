@@ -176,6 +176,11 @@ const bool FreenetMessageDownloader::HandleFCPMessage(FCPv2::Message &message)
 							st.ResultText(0,publickey);
 						}
 
+						if(publickey=="")
+						{
+							m_log->Error("FreenetMessageDownloader::HandleFCPMessage public key is empty");
+						}
+
 						m_log->Debug("FreenetMessageDownloader::HandleFCPMessage GetFailed, but retrying "+message["Identifier"]);
 						StartRequest(identityid,publickey,idparts[2],edition);
 					}
@@ -211,10 +216,12 @@ const bool FreenetMessageDownloader::HandleFLIPEvent(const FLIPEvent &flipevent)
 			if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_NEWMESSAGEEDITION)
 			{
 				StringFunctions::Convert(params["edition"],newedition);
+				m_log->Trace("FreenetMessageDownloader::HandleFLIPEvent EVENT_FREENET_NEWMESSAGEEDITION "+params["edition"]+" for "+params["identityid"]);
 			}
 			else if(flipevent.GetType()==FLIPEvent::EVENT_FREENET_IDENTITYFOUND)
 			{
 				StringFunctions::Convert(params["lastmessageindex"],newedition);
+				m_log->Trace("FreenetMessageDownloader::HandleFLIPEvent EVENT_FREENET_IDENTITYFOUND "+params["lastmessageindex"]+" for "+params["identityid"]);
 			}
 
 			st=m_db->Prepare("SELECT PublicKey FROM tblIdentity WHERE IdentityID=?;");
@@ -224,6 +231,11 @@ const bool FreenetMessageDownloader::HandleFLIPEvent(const FLIPEvent &flipevent)
 			if(st.RowReturned())
 			{
 				st.ResultText(0,publickey);
+			}
+
+			if(publickey=="")
+			{
+				m_log->Error("FreenetMessageDownloader::HandleFLIPEvent public key is empty");
 			}
 
 			st=m_db->Prepare("INSERT INTO tblRetrievedMessageIndex(IdentityID,Date,MessageIndex) VALUES(?,?,?);");
@@ -245,20 +257,23 @@ const bool FreenetMessageDownloader::HandleFLIPEvent(const FLIPEvent &flipevent)
 
 void FreenetMessageDownloader::StartRequest(const int identityid, const std::string &publickey, const std::string &date, const int edition)
 {
-	std::string identityidstr("");
-	std::string editionstr("0");
+	if(publickey!="")
+	{
+		std::string identityidstr("");
+		std::string editionstr("0");
 
-	StringFunctions::Convert(identityid,identityidstr);
-	StringFunctions::Convert(edition,editionstr);
+		StringFunctions::Convert(identityid,identityidstr);
+		StringFunctions::Convert(edition,editionstr);
 
-	FCPv2::Message mess("ClientGet");
-	mess["URI"]="SSK@"+publickey.substr(4)+m_messagebase+"|"+date+"|Message-"+editionstr;
-	mess["Identifier"]=m_fcpuniqueidentifier+"|"+identityidstr+"|"+date+"|"+editionstr+"|"+mess["URI"];
-	mess["RealTimeFlag"]="true";
-	mess["ReturnType"]="direct";
-	mess["MaxSize"]="32768";
+		FCPv2::Message mess("ClientGet");
+		mess["URI"]="SSK@"+publickey.substr(4)+m_messagebase+"|"+date+"|Message-"+editionstr;
+		mess["Identifier"]=m_fcpuniqueidentifier+"|"+identityidstr+"|"+date+"|"+editionstr+"|"+mess["URI"];
+		mess["RealTimeFlag"]="true";
+		mess["ReturnType"]="direct";
+		mess["MaxSize"]="32768";
 
-	m_fcp->Send(mess);
+		m_fcp->Send(mess);
 
-	m_log->Debug("FreenetMessageDownloader::StartRequest started request for "+mess["Identifier"]);
+		m_log->Debug("FreenetMessageDownloader::StartRequest started request for "+mess["Identifier"]);
+	}
 }

@@ -50,10 +50,13 @@ public:
 	void Trace(const std::string &text)		{ WriteLog(LOGLEVEL_TRACE,text); }
 
 	void WriteNewLine();
-	
+
+	void Rotate(const std::string &filename, const std::string &extension, const int keep=10);
+
 private:
 	void WriteDate();
 	void WriteLogLevel(LogLevel level);
+	void CheckRotate();
 
 	FILE *m_fileptr;
 	std::string m_filename;
@@ -63,6 +66,7 @@ private:
 	bool m_writenewline;
 	char *m_datebuffer;
 	dlib::rmutex m_mutex;
+	int m_lastwriteday;
 	
 };
 

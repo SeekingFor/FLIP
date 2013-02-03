@@ -29,13 +29,19 @@ void SetupDB(SQLite3DB::DB *db)
 			major=0;
 			minor=2;
 		}
+		if(major==0 && minor==2)
+		{
+			ConvertDB0002To0003(db);
+			major=0;
+			minor=3;
+		}
 	}
 	else
 	{
-		db->Execute("INSERT INTO tblDBVersion(Major,Minor) VALUES(0,2);");
+		db->Execute("INSERT INTO tblDBVersion(Major,Minor) VALUES(0,3);");
 	}
 
-	db->Execute("UPDATE tblDBVersion SET Major=0, Minor=2;");
+	db->Execute("UPDATE tblDBVersion SET Major=0, Minor=3;");
 
 	db->Execute("CREATE TABLE IF NOT EXISTS tblOption(\
 				Option				TEXT UNIQUE,\
@@ -62,8 +68,8 @@ void SetupDB(SQLite3DB::DB *db)
 
 	db->Execute("CREATE TABLE IF NOT EXISTS tblIdentity(\
 				IdentityID				INTEGER PRIMARY KEY,\
-				PublicKey				TEXT UNIQUE,\
-				RSAPublicKey			TEXT UNIQUE,\
+				PublicKey				TEXT,\
+				RSAPublicKey			TEXT,\
 				Name					TEXT,\
 				DateAdded				DATETIME,\
 				LastSeen				DATETIME,\
@@ -72,6 +78,8 @@ void SetupDB(SQLite3DB::DB *db)
 				AddedMethod				TEXT,\
 				FailureCount			INTEGER CHECK(FailureCount>=0) DEFAULT 0\
 				);");
+
+	db->Execute("CREATE UNIQUE INDEX IF NOT EXISTS idxIdentity_PublicKey ON tblIdentity(PublicKey,RSAPublicKey);");
 
 	db->Execute("CREATE TABLE IF NOT EXISTS tblIdentityEdition(\
 				IdentityID				INTEGER,\

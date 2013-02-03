@@ -130,15 +130,9 @@ int main(int argc, char *argv[])
 	IRCServer irc;
 	FreenetConnection fn;
 
-	unlink(std::string(global::basepath+"flip-5.log").c_str());
-	rename(std::string(global::basepath+"flip-4.log").c_str(),std::string(global::basepath+"flip-5.log").c_str());
-	rename(std::string(global::basepath+"flip-3.log").c_str(),std::string(global::basepath+"flip-4.log").c_str());
-	rename(std::string(global::basepath+"flip-2.log").c_str(),std::string(global::basepath+"flip-3.log").c_str());
-	rename(std::string(global::basepath+"flip-1.log").c_str(),std::string(global::basepath+"flip-2.log").c_str());
-	rename(std::string(global::basepath+"flip.log").c_str(),std::string(global::basepath+"flip-1.log").c_str());
-
 	global::log.SetFileName(global::basepath+"flip.log");
 	global::log.OpenFile();
+	global::log.Rotate("flip","log");
 	global::log.SetWriteDate(true);
 	global::log.SetWriteLogLevel(true);
 	global::log.SetWriteNewLine(true);

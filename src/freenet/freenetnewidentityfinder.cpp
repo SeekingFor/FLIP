@@ -16,6 +16,8 @@ FreenetNewIdentityFinder::~FreenetNewIdentityFinder()
 void FreenetNewIdentityFinder::FCPConnected()
 {
 	m_lastactivity.SetNowUTC();
+	m_lastfailed.SetNowUTC();
+	m_lastfailed.Add(0,0,-1);
 	m_waiting=false;
 }
 
@@ -94,6 +96,10 @@ const bool FreenetNewIdentityFinder::HandleFCPMessage(FCPv2::Message &message)
 					st.Step();
 				}
 			}
+			else
+			{
+				m_lastfailed.SetNowUTC();
+			}
 			m_waiting=false;
 			return true;
 		}
@@ -104,8 +110,10 @@ const bool FreenetNewIdentityFinder::HandleFCPMessage(FCPv2::Message &message)
 void FreenetNewIdentityFinder::Process()
 {
 	DateTime tenminutesago;
+	DateTime oneminuteago;
 	tenminutesago.Add(0,-10);
-	if(m_waiting==false || m_lastactivity<tenminutesago)
+	oneminuteago.Add(0,-1);
+	if((m_waiting==false && m_lastfailed<oneminuteago) || m_lastactivity<tenminutesago)
 	{
 		StartRequest();
 	}

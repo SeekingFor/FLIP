@@ -28,6 +28,7 @@ private:
 	std::string m_messagebase;
 	bool m_waiting;
 	DateTime m_lastactivity;
+	DateTime m_lastfailed;
 
 };
 

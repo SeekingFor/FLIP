@@ -16,6 +16,7 @@ LogFile::LogFile()
 	m_writeloglevel=false;
 	m_writenewline=true;
 	m_datebuffer=new char[100];
+	m_lastwriteday=-1;
 }
 
 LogFile::LogFile(const std::string &filename)
@@ -27,12 +28,26 @@ LogFile::LogFile(const std::string &filename)
 	m_filename=filename;
 	m_writenewline=true;
 	m_datebuffer=new char[100];
+	m_lastwriteday=-1;
 }
 
 LogFile::~LogFile()
 {
 	CloseFile();
 	delete [] m_datebuffer;
+}
+
+void LogFile::CheckRotate()
+{
+	time_t rawtime=time(NULL);
+	struct tm *timeinfo=gmtime(&rawtime);
+
+	if(m_lastwriteday!=-1 && timeinfo->tm_mday!=m_lastwriteday)
+	{
+		Rotate(m_filename.substr(0,m_filename.find('.')),m_filename.substr(m_filename.find('.')+1));
+	}
+
+	m_lastwriteday=timeinfo->tm_mday;
 }
 
 bool LogFile::CloseFile()
@@ -64,6 +79,38 @@ bool LogFile::OpenFile()
 	}
 }
 
+void LogFile::Rotate(const std::string &filename, const std::string &extension, const int keep)
+{
+	CloseFile();
+
+	std::string prevname("");
+	for(int i=keep-1; i>=0; i--)
+	{
+		m_filename=filename;
+		std::ostringstream ostr;
+		ostr << i;
+		if(i>0)
+		{
+			m_filename+="-"+ostr.str();
+		}
+		m_filename+="."+extension;
+
+		if(i==keep-1)
+		{
+			unlink(m_filename.c_str());
+		}
+		else
+		{
+			rename(m_filename.c_str(),prevname.c_str());
+		}
+
+		prevname=m_filename;
+	}
+
+	OpenFile();
+
+}
+
 void LogFile::WriteDate()
 {
 	if(m_fileptr)
@@ -81,6 +128,9 @@ void LogFile::WriteDate()
 void LogFile::WriteLog(const std::string &text)
 {
 	dlib::auto_mutex guard(m_mutex);
+
+	CheckRotate();
+
 	if(!m_fileptr)
 	{
 		OpenFile();	
@@ -104,6 +154,9 @@ void LogFile::WriteLog(const std::string &text)
 void LogFile::WriteLog(const LogLevel level, const std::string &text)
 {
 	dlib::auto_mutex guard(m_mutex);
+
+	CheckRotate();
+
 	if(level<=m_loglevel)
 	{
 		if(!m_fileptr)

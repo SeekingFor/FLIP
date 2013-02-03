@@ -25,7 +25,7 @@ void SetupDefaultOptions(SQLite3DB::DB *db)
 	st.Reset();
 	upd.Bind(0,"Program");
 	upd.Bind(1,order++);
-	upd.Bind(2,"1|1 - Fatal Errors|2|2 - Critical Errors|3|3 - Errors|4|4 - Warnings|5|5 - Notices|6|6 - Informational Messages|7|7 - Debug Messages|8|8 - Trace Messages");
+	upd.Bind(2,"0|0 - Fatal Errors|1|1 - Errors|2|2 - Warnings|3|3 - Informational Messages|4|4 - Debug Messages|5|5 - Trace Messages");
 	upd.Bind(3,"The maximum logging level that will be written to file.  Higher levels will include all messages from the previous levels.");
 	upd.Bind(4,"select");
 	upd.Bind(5);

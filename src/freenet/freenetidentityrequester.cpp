@@ -1,6 +1,7 @@
 #include "freenetidentityrequester.h"
 #include "freenetmessage.h"
 #include "../option.h"
+#include "../rsakeypair.h"
 #include "../stringfunctions.h"
 #include "../irc/ircnick.h"
 
@@ -67,23 +68,38 @@ const bool FreenetIdentityRequester::HandleFCPMessage(FCPv2::Message &message)
 				{
 					if(IRCNick::IsValid(fm["name"]))
 					{
-						st=m_db->Prepare("UPDATE tblIdentity SET Name=?, LastSeen=?, RSAPublicKey=? WHERE IdentityID=?;");
-						st.Bind(0,fm["name"]);
-						st.Bind(1,now.Format("%Y-%m-%d %H:%M:%S"));
-						st.Bind(2,fm["rsapublickey"]);
-						st.Bind(3,identityid);
-						st.Step();
+						RSAKeyPair rsa;
+						if(fm["rsapublickey"]!="" && rsa.SetFromEncodedPublicKey(fm["rsapublickey"])==true)
+						{
+							st=m_db->Prepare("UPDATE tblIdentity SET Name=?, LastSeen=?, RSAPublicKey=? WHERE IdentityID=?;");
+							st.Bind(0,fm["name"]);
+							st.Bind(1,now.Format("%Y-%m-%d %H:%M:%S"));
+							st.Bind(2,fm["rsapublickey"]);
+							st.Bind(3,identityid);
+							if(st.Step()==true)
+							{
+								std::map<std::string,std::string> eventparams;
+								eventparams["name"]=fm["name"];
+								eventparams["identityid"]=idparts[1];
+								eventparams["date"]=idparts[2];
+								eventparams["lastmessageindex"]=fm["lastmessageindex"];
 
-						std::map<std::string,std::string> eventparams;
-						eventparams["name"]=fm["name"];
-						eventparams["identityid"]=idparts[1];
-						eventparams["date"]=idparts[2];
-						eventparams["lastmessageindex"]=fm["lastmessageindex"];
+								// dispatch event for finding active id
+								DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_FREENET_IDENTITYFOUND,eventparams));
 
-						// dispatch event for finding active id
-						DispatchFLIPEvent(FLIPEvent(FLIPEvent::EVENT_FREENET_IDENTITYFOUND,eventparams));
-
-						m_log->Debug("FreenetIdentityRequester::HandleFCPMessage retrieved identity "+message["Identifier"]);
+								m_log->Debug("FreenetIdentityRequester::HandleFCPMessage retrieved identity "+message["Identifier"]);
+							}
+							else
+							{
+								std::string errstr("");
+								m_db->GetLastError(errstr);
+								m_log->Error("FreenetIdentityRequester::HandleFCPMessage couldn't update tblIdentity : "+errstr);
+							}
+						}
+						else
+						{
+							m_log->Error("FreenetIdentityRequester::HandleFCPMessage identity contained invalid RSA Public Key "+message["Identifier"]);
+						}
 
 					}
 					else
