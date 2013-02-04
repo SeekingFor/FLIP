@@ -59,7 +59,7 @@ const bool FreenetNewIdentityFinder::HandleFCPMessage(FCPv2::Message &message)
 				publickey.insert(publickey.end(),data.begin(),data.end());
 				if(publickey!="" && publickey.find("SSK@")==0 && publickey.find(",")!=std::string::npos && publickey.find("/")==publickey.size()-1)
 				{
-					SQLite3DB::Statement st=m_db->Prepare("INSERT INTO tblIdentity(PublicKey,DateAdded,AddedMethod) VALUES(?,?,'Automatic announcement');");
+					SQLite3DB::Statement st=m_db->Prepare("INSERT OR IGNORE INTO tblIdentity(PublicKey,DateAdded,AddedMethod) VALUES(?,?,'Automatic announcement');");
 					st.Bind(0,publickey);
 					st.Bind(1,now.Format("%Y-%m-%d %H:%M:%S"));
 					st.Step();

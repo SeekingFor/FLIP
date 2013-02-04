@@ -6,9 +6,9 @@
 
 #define FLIP_MAJOR		"0"
 #define FLIP_MINOR		"1"
-#define FLIP_RELEASE	"6"
+#define FLIP_RELEASE	"7"
 #define FLIP_VERSION	FLIP_MAJOR"."FLIP_MINOR"."FLIP_RELEASE
-#define FLIP_VERSION_LONG	1006
+#define FLIP_VERSION_LONG	1007
 
 namespace global
 {

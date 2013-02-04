@@ -33,3 +33,23 @@ void ConvertDB0002To0003(SQLite3DB::DB *db)
 	db->Execute("INSERT INTO tblIdentity(IdentityID,PublicKey,RSAPublicKey,Name,DateAdded,LastSeen,LastMessage,Ignored,AddedMethod,FailureCount) SELECT IdentityID,PublicKey,RSAPublicKey,Name,DateAdded,LastSeen,LastMessage,Ignored,AddedMethod,FailureCount FROM tmpIdentity;");
 	db->Execute("DROP TABLE tmpIdentity;");
 }
+
+void ConvertDB0003To0004(SQLite3DB::DB *db)
+{
+	db->Execute("CREATE TABLE tmpIdentity AS SELECT * FROM tblIdentity WHERE RSAPublicKey IS NOT NULL;");
+	db->Execute("DROP TABLE tblIdentity;");
+	db->Execute("CREATE TABLE IF NOT EXISTS tblIdentity(\
+				IdentityID				INTEGER PRIMARY KEY AUTOINCREMENT,\
+				PublicKey				TEXT UNIQUE,\
+				RSAPublicKey			TEXT,\
+				Name					TEXT,\
+				DateAdded				DATETIME,\
+				LastSeen				DATETIME,\
+				LastMessage				DATETIME,\
+				Ignored					BOOL CHECK(Ignored IN(0,1)) DEFAULT 0,\
+				AddedMethod				TEXT,\
+				FailureCount			INTEGER CHECK(FailureCount>=0) DEFAULT 0\
+				);");
+	db->Execute("INSERT INTO tblIdentity(IdentityID,PublicKey,RSAPublicKey,Name,DateAdded,LastSeen,LastMessage,Ignored,AddedMethod,FailureCount) SELECT IdentityID,PublicKey,RSAPublicKey,Name,DateAdded,LastSeen,LastMessage,Ignored,AddedMethod,FailureCount FROM tmpIdentity;");
+	db->Execute("DROP TABLE tmpIdentity;");
+}
